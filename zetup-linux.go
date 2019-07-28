@@ -27,6 +27,9 @@ func ZetupLinux() {
 	username := os.Getenv("USER")
 	randInt := rand.Intn(10000000000000)
 	ZETUP_INSTALLATION_ID := fmt.Sprintf("zetup %v %v %v", hostname, username, randInt)
-	log.Printf(ZETUP_INSTALLATION_ID)
+
+	// create directories
+	ZETUP_BACKUP_DIR = fmt.Sprintf("%v", os.UserHomeDir())
+	fmt.Sprintf(ZETUP_BACKUP_DIR)
 
 }
