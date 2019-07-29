@@ -3,7 +3,11 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -16,6 +20,7 @@ import (
 	"text/template"
 
 	uuid "github.com/satori/go.uuid"
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -65,7 +70,62 @@ func ZetupLinux() {
 	USER_INFO_FILE = fmt.Sprintf("%v/user_info.json", ZETUP_CONFIG_DIR)
 	userInfo := getUserInfo(githubToken)
 	writeGitConfig(userInfo)
+	ensureSSHKey(userInfo.Username, githubToken)
+}
 
+func ensureSSHKey(username string, githubToken string) {
+	PUBLIC_KEY_FILE := fmt.Sprintf("%v/.ssh/id_rsa.pub", HOMEDIR)
+	PRIVATE_KEY_FILE := fmt.Sprintf("%v/.ssh/id_rsa", HOMEDIR)
+	if _, err := os.Stat(PUBLIC_KEY_FILE); err == nil {
+		return // already created public key, assume it's on github
+	}
+
+	bitSize := 4096
+
+	privateKey, err := generatePrivateKey(bitSize)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	publicKeyBytes, err := generatePublicKey(&privateKey.PublicKey)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	privateKeyBytes := encodePrivateKeyToPEM(privateKey)
+
+	err = writeKeyToFile(privateKeyBytes, PRIVATE_KEY_FILE)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	err = writeKeyToFile([]byte(publicKeyBytes), PUBLIC_KEY_FILE)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	addPublicKeyToGithub(string(publicKeyBytes), username, githubToken)
+}
+
+func addPublicKeyToGithub(pubKey string, username string, githubToken string) {
+	log.Println("adding public key to github")
+	body := strings.NewReader(fmt.Sprintf(`{
+				"title": %v,
+				"key": "$(cat $HOME/.ssh/id_rsa.pub)"
+			}`, ZETUP_INSTALLATION_ID))
+	req, err := http.NewRequest("POST", "https://api.github.com/user/keys", body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req.SetBasicAuth(username, githubToken)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer resp.Body.Close()
 }
 
 func check(err error) {
@@ -279,4 +339,63 @@ func getPassword(prompt string) string {
 
 	// Return the password as a string.
 	return string(p)
+}
+
+// ↓ https://gist.github.com/devinodaniel/8f9b8a4f31573f428f29ec0e884e6673
+// generatePrivateKey creates a RSA Private Key of specified byte size
+func generatePrivateKey(bitSize int) (*rsa.PrivateKey, error) {
+	// Private Key generation
+	privateKey, err := rsa.GenerateKey(rand.Reader, bitSize)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate Private Key
+	err = privateKey.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	return privateKey, nil
+}
+
+// encodePrivateKeyToPEM encodes Private Key from RSA to PEM format
+func encodePrivateKeyToPEM(privateKey *rsa.PrivateKey) []byte {
+	// Get ASN.1 DER format
+	privDER := x509.MarshalPKCS1PrivateKey(privateKey)
+
+	// pem.Block
+	privBlock := pem.Block{
+		Type:    "RSA PRIVATE KEY",
+		Headers: nil,
+		Bytes:   privDER,
+	}
+
+	// Private key in PEM format
+	privatePEM := pem.EncodeToMemory(&privBlock)
+
+	return privatePEM
+}
+
+// generatePublicKey take a rsa.PublicKey and return bytes suitable for writing to .pub file
+// returns in the format "ssh-rsa ..."
+func generatePublicKey(privatekey *rsa.PublicKey) ([]byte, error) {
+	publicRsaKey, err := ssh.NewPublicKey(privatekey)
+	if err != nil {
+		return nil, err
+	}
+
+	pubKeyBytes := ssh.MarshalAuthorizedKey(publicRsaKey)
+
+	return pubKeyBytes, nil
+}
+
+// writePemToFile writes keys to a file
+func writeKeyToFile(keyBytes []byte, saveFileTo string) error {
+	err := ioutil.WriteFile(saveFileTo, keyBytes, 0600)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
