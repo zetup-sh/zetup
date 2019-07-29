@@ -154,7 +154,6 @@ func createToken() string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("%v", resp)
 
 	defer resp.Body.Close()
 
