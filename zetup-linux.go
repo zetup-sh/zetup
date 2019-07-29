@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"text/template"
 
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/ssh/terminal"
@@ -21,6 +22,7 @@ import (
 var USER_INFO_FILE = ""
 var ZETUP_CONFIG_DIR = ""
 var ZETUP_INSTALLATION_ID = ""
+var HOMEDIR = ""
 
 // Note: will support gitlab when https://gitlab.com/gitlab-org/gitlab-ce/issues/27954 goes through
 
@@ -45,27 +47,43 @@ func ZetupLinux() {
 	ZETUP_INSTALLATION_ID = fmt.Sprintf("zetup %v %v %v", hostname, username, idNum)
 
 	// create directories
-	homedir, err := os.UserHomeDir()
+	HOMEDIR, err = os.UserHomeDir()
 	if err != nil {
 		log.Fatal(err)
 	}
-	ZETUP_BACKUP_DIR := fmt.Sprintf("%v/.zetup/.bak", homedir)
+	ZETUP_BACKUP_DIR := fmt.Sprintf("%v/.zetup/.bak", HOMEDIR)
 	err = os.MkdirAll(ZETUP_BACKUP_DIR, 0755)
 	if err != nil {
 		log.Fatal(err)
 	}
-	ZETUP_CONFIG_DIR = fmt.Sprintf("%v/.config/zetup", homedir)
+	ZETUP_CONFIG_DIR = fmt.Sprintf("%v/.config/zetup", HOMEDIR)
 	err = os.MkdirAll(ZETUP_CONFIG_DIR, 0755)
 	if err != nil {
 		log.Fatal(err)
 	}
 	githubToken := getToken()
-	log.Println("hello world")
-	log.Printf("githubToken = %+v\n", githubToken)
 	USER_INFO_FILE = fmt.Sprintf("%v/user_info.json", ZETUP_CONFIG_DIR)
 	userInfo := getUserInfo(githubToken)
-	log.Printf("userInfo = %+v\n", userInfo)
+	writeGitConfig(userInfo)
 
+}
+
+func check(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func writeGitConfig(userInfo UserInfo) {
+	fileTmpl := `[user]
+name = {{.Name}}
+email = {{.Email}}
+`
+	t := template.Must(template.New("tgitconfig").Parse(fileTmpl))
+	var tplBuff bytes.Buffer
+
+	check(t.Execute(&tplBuff, userInfo))
+	_ = ioutil.WriteFile(fmt.Sprintf("%v/.gitconfig", HOMEDIR), []byte(tplBuff.String()), 0644)
 }
 
 type UserInfo struct {
