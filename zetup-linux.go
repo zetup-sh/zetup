@@ -119,7 +119,6 @@ func createToken() string {
 	if len(password) == 0 {
 		password = getPassword("Github Password: ")
 	}
-	fmt.Println(ZETUP_INSTALLATION_ID)
 
 	data := TokenPayload{
 		Note: ZETUP_INSTALLATION_ID,
