@@ -19,7 +19,7 @@ import (
 	"syscall"
 	"text/template"
 
-	uuid "github.com/satori/go.uuid"
+	petname "github.com/dustinkirkland/golang-petname"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
 )
@@ -48,7 +48,7 @@ func ZetupLinux() {
 		panic(err)
 	}
 	username := os.Getenv("USER")
-	idNum := uuid.NewV4()
+	idNum := petname.Generate(3, "-")
 	ZETUP_INSTALLATION_ID = fmt.Sprintf("zetup %v %v %v", hostname, username, idNum)
 
 	// create directories
@@ -107,11 +107,10 @@ func ensureSSHKey(username string, githubToken string) {
 }
 
 func addPublicKeyToGithub(pubKey string, username string, githubToken string) {
-	log.Println("adding public key to github")
 	body := strings.NewReader(fmt.Sprintf(`{
-				"title": %v,
-				"key": "$(cat $HOME/.ssh/id_rsa.pub)"
-			}`, ZETUP_INSTALLATION_ID))
+				"title": "%v",
+				"key": "%v"
+			}`, ZETUP_INSTALLATION_ID, strings.TrimRight(pubKey, "\n")))
 	req, err := http.NewRequest("POST", "https://api.github.com/user/keys", body)
 	if err != nil {
 		log.Fatal(err)
@@ -121,6 +120,7 @@ func addPublicKeyToGithub(pubKey string, username string, githubToken string) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := http.DefaultClient.Do(req)
+	log.Printf("resp = %+v\n", resp)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -136,8 +136,8 @@ func check(err error) {
 
 func writeGitConfig(userInfo UserInfo) {
 	fileTmpl := `[user]
-name = {{.Name}}
-email = {{.Email}}
+	name = {{.Name}}
+	email = {{.Email}}
 `
 	t := template.Must(template.New("tgitconfig").Parse(fileTmpl))
 	var tplBuff bytes.Buffer
