@@ -66,13 +66,15 @@ type TokenInfo struct {
 	Token string `json:"token"`
 }
 
+var TOKEN_INFO_FILE string
+
 func getToken() string {
 	// if the github token environment variable is set use that
 	envVar := os.Getenv("ZETUP_GITHUB_TOKEN")
 	if len(envVar) > 0 {
 		return envVar
 	}
-	TOKEN_INFO_FILE := fmt.Sprintf("%v/github_personal_access_token_info.json", ZETUP_CONFIG_DIR)
+	TOKEN_INFO_FILE = fmt.Sprintf("%v/github_personal_access_token_info.json", ZETUP_CONFIG_DIR)
 
 	// if the token info file exists, parse that
 	if _, err := os.Stat(TOKEN_INFO_FILE); err == nil {
@@ -120,6 +122,7 @@ func createToken() string {
 		password = getPassword("Github Password: ")
 	}
 
+	// send token request
 	data := TokenPayload{
 		Note: ZETUP_INSTALLATION_ID,
 		Scopes: []string{
@@ -162,11 +165,20 @@ func createToken() string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("%v", respTokenData)
 
-	return "hello"
+	// write token to file
+	properlyFormatted := TokenInfo{
+		Token: respTokenData.Token,
+		Id:    respTokenData.Id,
+	}
+	file, _ := json.MarshalIndent(properlyFormatted, "", " ")
+	_ = ioutil.WriteFile(TOKEN_INFO_FILE, file, 0644)
+	return respTokenData.Token
 }
 
+/*
+* Not my code ↓
+ */
 func getPassword(prompt string) string {
 	// Get the initial state of the terminal.
 	initialTermState, e1 := terminal.GetState(syscall.Stdin)
