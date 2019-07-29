@@ -107,7 +107,6 @@ func ensureSSHKey(username string, githubToken string) {
 }
 
 func addPublicKeyToGithub(pubKey string, username string, githubToken string) {
-	log.Println("adding public key to github")
 	body := strings.NewReader(fmt.Sprintf(`{
 				"title": %v,
 				"key": "$(cat $HOME/.ssh/id_rsa.pub)"
