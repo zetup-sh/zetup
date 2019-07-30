@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"runtime"
+
+	"github.com/zwhitchcox/zetup/cmdLinux"
 )
 
 func main() {
@@ -10,7 +12,7 @@ func main() {
 	case "darwin":
 		ZetupDarwin()
 	case "linux":
-		ZetupLinux()
+		cmdLinux.Execute()
 	case "windows":
 		ZetupWindows()
 	default:

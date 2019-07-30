@@ -13,10 +13,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cmd
+package cmdLinux
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -26,13 +27,18 @@ import (
 )
 
 var cfgFile string
+var name string
+var github_username string
+var email string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "zetup",
 	Short: "declarative bash environments",
 	Long:  `Easily change between multiple setups for your development environment.`,
-	//Run:   func(cmd *cobra.Command, args []string) {},
+	//Run: func(cmd *cobra.Command, args []string) {
+	//log.Println("print this")
+	//},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -50,12 +56,25 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.zetup.yml)")
+	rootCmd.PersistentFlags().StringVarP(&name, "name", "", "", "your name")
+	rootCmd.PersistentFlags().StringVarP(&githubUsername, "github-username", "", "", "your github username")
+	rootCmd.PersistentFlags().StringVarP(&backupDir, "backup-dir", "", preHome(".zetup/.bak"), "where zetup stores backup of your files")
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.zetup.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&email, "email", "", "", "your email")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+}
+func preHome(location string) {
+	home, err := homedir.Dir()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Sprintf("%v/%v", home, location)
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -76,10 +95,13 @@ func initConfig() {
 		viper.SetConfigName(".zetup")
 	}
 
+	//viper.AutomaticEnv()
+	viper.SetEnvPrefix("ZETUP")
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
+		//fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
+	log.Println(viper.GetString("github-username"))
 }
