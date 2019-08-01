@@ -21,6 +21,8 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/asn1"
+	"encoding/gob"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -228,13 +230,13 @@ func initConfig() {
 
 	publicKeyFile := viper.GetString("public-key-file")
 	if publicKeyFile == "" {
-		publicKeyFile = path.Join(home, ".ssh", "id_rsa")
+		publicKeyFile = path.Join(home, ".ssh", "zetup_id_rsa.pub")
 		viper.Set("public-key-file", publicKeyFile)
 	}
 
 	privateKeyFile := viper.GetString("private-key-file")
 	if privateKeyFile == "" {
-		privateKeyFile = path.Join(home, ".ssh", "id_rsa.pub")
+		privateKeyFile = path.Join(home, ".ssh", "zetup_id_rsa")
 		viper.Set("private-key-file", privateKeyFile)
 	}
 
@@ -248,8 +250,14 @@ func initConfig() {
 func ensureSSHKey() {
 	publicKeyFile := viper.GetString("public-key-file")
 	privateKeyFile := viper.GetString("private-key-file")
+	// if we have an ssh id, public key file, and private key file
+	// assume all is well
 	if viper.GetString("ssh-key-id") != "" {
-		return // already created public key, assume it's on github
+		if _, err := os.Stat(publicKeyFile); !os.IsNotExist(err) {
+			if _, err := os.Stat(privateKeyFile); !os.IsNotExist(err) {
+				return
+			}
+		}
 	}
 
 	bitSize := 4096
@@ -566,4 +574,66 @@ func writeKeyToFile(keyBytes []byte, saveFileTo string) error {
 	}
 
 	return nil
+}
+
+// different source https://gist.github.com/sdorra/1c95de8cb80da31610d2ad767cd6f251
+
+func saveGobKey(fileName string, key interface{}) {
+	outFile, err := os.Create(fileName)
+	checkError(err)
+	defer outFile.Close()
+
+	encoder := gob.NewEncoder(outFile)
+	err = encoder.Encode(key)
+	checkError(err)
+	err = os.Chmod(fileName, 0600)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func savePEMKey(fileName string, key *rsa.PrivateKey) {
+	outFile, err := os.Create(fileName)
+	checkError(err)
+	defer outFile.Close()
+
+	var privateKey = &pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	}
+
+	err = pem.Encode(outFile, privateKey)
+	checkError(err)
+	err = os.Chmod(fileName, 0600)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func savePublicPEMKey(fileName string, pubkey rsa.PublicKey) {
+	asn1Bytes, err := asn1.Marshal(pubkey)
+	checkError(err)
+
+	var pemkey = &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: asn1Bytes,
+	}
+
+	pemfile, err := os.Create(fileName)
+	checkError(err)
+	defer pemfile.Close()
+
+	err = pem.Encode(pemfile, pemkey)
+	checkError(err)
+	err = os.Chmod(fileName, 0600)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func checkError(err error) {
+	if err != nil {
+		fmt.Println("Fatal error ", err.Error())
+		os.Exit(1)
+	}
 }

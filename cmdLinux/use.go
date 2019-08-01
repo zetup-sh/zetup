@@ -35,6 +35,7 @@ var useCmd = &cobra.Command{
 	Short: "Specify a zetup package to use",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
+		return
 		// get sudo privileges early, in case they want to do
 		// something else while it's installing
 		//getSudoCmd := exec.Command("sudo", "echo", "have sudo privileges")
