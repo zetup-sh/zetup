@@ -29,8 +29,11 @@ import (
 	mathrand "math/rand"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path"
+	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -70,13 +73,31 @@ var githubUsername string
 var githubPassword string
 var email string
 var zetupDir string
-var backupDir string
+var bakDir string
 var installationId string
 var privateKeyFile string
 var publicKeyFile string
 var githubToken string
+var pkgDir string
 
 func init() {
+	// make sure user is not root on linux
+	if runtime.GOOS == "linux" {
+		cmd := exec.Command("id", "-u")
+		output, err := cmd.Output()
+
+		if err != nil {
+			log.Fatal(err)
+		}
+		i, err := strconv.Atoi(string(output[:len(output)-1]))
+
+		if err != nil {
+			log.Fatal(err)
+		}
+		if i == 0 {
+			log.Fatal("Please don't run zetup as root. zetup is meant for user accounts. If you really need to run as root, please open an issue, but it will probably mess up the permissions systems if you do.")
+		}
+	}
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	cobra.OnInitialize(initConfig)
@@ -88,15 +109,27 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is $HOME/.zetup/config.yml)")
-	rootCmd.PersistentFlags().StringVarP(&githubUsername, "github-username", "", "", "your github username (default is $USER)")
-	rootCmd.PersistentFlags().StringVarP(&githubPassword, "github-password", "", "", "your github password, only needed for creating token")
-	rootCmd.PersistentFlags().StringVarP(&backupDir, "backupdir", "", ".bak", "name of directory where zetup stores backup of your files")
-	rootCmd.PersistentFlags().StringVarP(&zetupDir, "zetup-dir", "z", "", "where zetup stores its files (default is $HOME/.zetup)")
-	rootCmd.PersistentFlags().StringVarP(&installationId, "installation-id", "", "", "installation id used for this particular installation of zetup (for github keys/tokens and other things)")
-	rootCmd.PersistentFlags().StringVarP(&githubToken, "github-token", "", "", "github personal access token")
-	rootCmd.PersistentFlags().StringVarP(&publicKeyFile, "public-key-file", "", "", "ssh public key file")
-	rootCmd.PersistentFlags().StringVarP(&privateKeyFile, "private-key-file", "", "", "ssh private key file")
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "",
+		"config file (default is $HOME/.zetup/config.yml)")
+	rootCmd.PersistentFlags().StringVarP(&githubUsername, "github-username",
+		"", "", "your github username (default is $USER)")
+	rootCmd.PersistentFlags().StringVarP(&githubPassword, "github-password",
+		"", "", "your github password, only needed for creating token")
+	rootCmd.PersistentFlags().StringVarP(&bakDir, "backup-dir", "", "",
+		"name of directory where zetup stores backup of your files")
+	rootCmd.PersistentFlags().StringVarP(&zetupDir, "zetup-dir", "z", "",
+		"where zetup stores its files (default is $HOME/.zetup)")
+	rootCmd.PersistentFlags().StringVarP(&pkgDir, "pkg-dir", "", "",
+		"where zetup stores zetup packages (default is $ZETUP_DIR/pkg)")
+	rootCmd.PersistentFlags().StringVarP(&installationId, "installation-id", "",
+		"", "installation id used for this particular installation of zetup (for"+
+			"github keys/tokens and other things)")
+	rootCmd.PersistentFlags().StringVarP(&githubToken, "github-token", "", "",
+		"github personal access token")
+	rootCmd.PersistentFlags().StringVarP(&publicKeyFile, "public-key-file", "", "",
+		"ssh public key file")
+	rootCmd.PersistentFlags().StringVarP(&privateKeyFile, "private-key-file", "",
+		"", "ssh private key file")
 	rootCmd.PersistentFlags().StringVarP(&name, "user.name", "", "", "your name")
 	rootCmd.PersistentFlags().StringVarP(&email, "user.email", "", "", "your email")
 
@@ -133,6 +166,27 @@ func initConfig() {
 		if err != nil {
 			log.Fatal(err)
 		}
+
+	}
+
+	pkgDir = viper.GetString("pkg-dir")
+	if pkgDir == "" {
+		pkgDir = path.Join(zetupDir, "pkg")
+		viper.Set("pkg-dir", pkgDir)
+	}
+	err = os.MkdirAll(pkgDir, 0755)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	bakDir = viper.GetString("backup-dir")
+	if bakDir == "" {
+		bakDir = path.Join(zetupDir, "bak")
+		viper.Set("backup-dir", bakDir)
+	}
+	err = os.MkdirAll(bakDir, 0755)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	// If a config file is found, read it in.
@@ -148,12 +202,12 @@ func initConfig() {
 		emptyFile.Close()
 	}
 
-	backupDir := viper.GetString("backupdir")
-	if backupDir == "" {
-		backupDir = ".bak"
-		viper.Set("backupdir", backupDir)
+	bakDir := viper.GetString("backup-dir")
+	if bakDir == "" {
+		bakDir = ".bak"
+		viper.Set("backupdir", bakDir)
 	}
-	err = os.MkdirAll(backupDir, 0755)
+	err = os.MkdirAll(bakDir, 0755)
 	if err != nil {
 		log.Fatal(err)
 	}
