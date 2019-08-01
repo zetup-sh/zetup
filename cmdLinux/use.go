@@ -17,9 +17,9 @@ package cmdLinux
 
 import (
 	"log"
+	"os/exec"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // initCmd represents the init command
@@ -28,8 +28,13 @@ var useCmd = &cobra.Command{
 	Short: "Specify a zetup config to use",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		name := viper.GetString("name")
-		log.Println(name)
+		// get sudo privileges
+		getSudoCmd := exec.Command("sudo", "echo", "have sudo privileges")
+		err := getSudoCmd.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = getSudoCmd.Wait()
 	},
 }
 
