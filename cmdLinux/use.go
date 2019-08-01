@@ -35,7 +35,6 @@ var useCmd = &cobra.Command{
 	Short: "Specify a zetup package to use",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		return
 		// get sudo privileges early, in case they want to do
 		// something else while it's installing
 		//getSudoCmd := exec.Command("sudo", "echo", "have sudo privileges")
@@ -68,7 +67,6 @@ var useCmd = &cobra.Command{
 			username := splitPath[1]
 			githubUsername := viper.GetString("github-username")
 			if githubUsername != username {
-				log.Printf("70 = %+v\n", 70)
 				url = "https://github.com/" + username + "/" + splitPath[2] + ".git"
 			} else {
 				url = "git@github.com:" + username + "/" + splitPath[2] + ".git"
