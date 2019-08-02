@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cmdLinux
+package cmd
 
 import (
 	"io/ioutil"
@@ -23,6 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zwhitchcox/zetup/cmd/util"
 )
 
 // initCmd represents the init command
@@ -77,7 +78,7 @@ func deleteGithubToken() {
 	password := viper.GetString("github-password")
 	if password == "" {
 		log.Println("Sorry, I can only delete the personal access token with your password.")
-		password = getPassword("Github Password: ")
+		password = util.GetPassword("Github Password: ")
 	}
 	req, err := http.NewRequest("DELETE", "https://api.github.com/authorizations/"+githubTokenId, nil)
 	if err != nil {

@@ -1,23 +1,18 @@
 package main
 
-import (
-	"fmt"
-	"runtime"
-
-	"github.com/zwhitchcox/zetup/cmdLinux"
-)
+import "github.com/zwhitchcox/zetup/cmd"
 
 func main() {
-	switch os := runtime.GOOS; os {
-	case "darwin":
-		ZetupDarwin()
-	case "linux":
-		cmdLinux.Execute()
-	case "windows":
-		ZetupWindows()
-	default:
-		// freebsd, openbsd,
-		// plan9, windows...
-		fmt.Printf("%s.\n", os)
-	}
+	cmd.Execute()
+	//switch os := runtime.GOOS; os {
+	//case "darwin":
+	//ZetupDarwin()
+	//case "linux":
+	//case "windows":
+	//ZetupWindows()
+	//default:
+	//// freebsd, openbsd,
+	//// plan9, windows...
+	//fmt.Printf("%s.\n", os)
+	//}
 }

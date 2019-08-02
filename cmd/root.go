@@ -13,18 +13,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cmdLinux
+package cmd
 
 import (
 	"bufio"
 	"bytes"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/asn1"
-	"encoding/gob"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -32,18 +26,15 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path"
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/terminal"
+	"github.com/zwhitchcox/zetup/cmd/util"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
@@ -81,6 +72,7 @@ var privateKeyFile string
 var publicKeyFile string
 var githubToken string
 var pkgDir string
+var verbose bool
 
 func init() {
 	// make sure user is not root on linux
@@ -100,7 +92,7 @@ func init() {
 			log.Fatal("Please don't run zetup as root. zetup is meant for user accounts. If you really need to run as root, please open an issue, but it will probably mess up the permissions systems if you do.")
 		}
 	}
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.SetFlags(log.Lshortfile)
 
 	cobra.OnInitialize(initConfig)
 
@@ -134,6 +126,7 @@ func init() {
 		"", "ssh private key file")
 	rootCmd.PersistentFlags().StringVarP(&name, "user.name", "", "", "your name")
 	rootCmd.PersistentFlags().StringVarP(&email, "user.email", "", "", "your email")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -171,6 +164,7 @@ func initConfig() {
 
 	}
 
+	viper.Set("verbose", verbose)
 	pkgDir = viper.GetString("pkg-dir")
 	if pkgDir == "" {
 		pkgDir = path.Join(zetupDir, "pkg")
@@ -250,8 +244,6 @@ func initConfig() {
 func ensureSSHKey() {
 	publicKeyFile := viper.GetString("public-key-file")
 	privateKeyFile := viper.GetString("private-key-file")
-	// if we have an ssh id, public key file, and private key file
-	// assume all is well
 	if viper.GetString("ssh-key-id") != "" {
 		if _, err := os.Stat(publicKeyFile); !os.IsNotExist(err) {
 			if _, err := os.Stat(privateKeyFile); !os.IsNotExist(err) {
@@ -259,32 +251,37 @@ func ensureSSHKey() {
 			}
 		}
 	}
+	if viper.GetBool("verbose") {
+		log.Println("creating ssh key pair...")
+	}
 
 	bitSize := 4096
 
-	privateKey, err := generatePrivateKey(bitSize)
+	privateKey, err := util.GeneratePrivateKey(bitSize)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
-	publicKeyBytes, err := generatePublicKey(&privateKey.PublicKey)
+	publicKeyBytes, err := util.GeneratePublicKey(&privateKey.PublicKey)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
-	privateKeyBytes := encodePrivateKeyToPEM(privateKey)
+	privateKeyBytes := util.EncodePrivateKeyToPEM(privateKey)
 
-	err = writeKeyToFile(privateKeyBytes, privateKeyFile)
-	log.Printf("privateKeyFile = %+v\n", privateKeyFile)
+	err = util.WriteKeyToFile(privateKeyBytes, privateKeyFile)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
-	err = writeKeyToFile([]byte(publicKeyBytes), publicKeyFile)
+	err = util.WriteKeyToFile([]byte(publicKeyBytes), publicKeyFile)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 	addPublicKeyToGithub(string(publicKeyBytes), viper.GetString("github-token"))
+	if viper.GetBool("verbose") {
+		log.Println("ssh key pair created.")
+	}
 }
 
 type SSHKeyInfo struct {
@@ -418,7 +415,7 @@ func ensureToken() {
 
 	password := viper.GetString("github-password")
 	if password == "" {
-		password = getPassword("Github Password: ")
+		password = util.GetPassword("Github Password: ")
 	}
 
 	// send token request
@@ -480,160 +477,7 @@ func ensureToken() {
 *
 
 
+Not my code from here on out ↓
 
 
-Not my code ↓
 */
-func getPassword(prompt string) string {
-	// Get the initial state of the terminal.
-	initialTermState, e1 := terminal.GetState(syscall.Stdin)
-	if e1 != nil {
-		panic(e1)
-	}
-
-	// Restore it in the event of an interrupt.
-	// CITATION: Konstantin Shaposhnikov - https://groups.google.com/forum/#!topic/golang-nuts/kTVAbtee9UA
-
-	c := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt, os.Kill)
-	go func() {
-		<-c
-		_ = terminal.Restore(syscall.Stdin, initialTermState)
-		os.Exit(1)
-	}()
-
-	// Now get the password.
-	fmt.Print(prompt)
-	p, err := terminal.ReadPassword(syscall.Stdin)
-	fmt.Println("")
-	if err != nil {
-		panic(err)
-	}
-
-	// Stop looking for ^C on the channel.
-	signal.Stop(c)
-
-	// Return the password as a string.
-	return string(p)
-}
-
-// ↓ https://gist.github.com/devinodaniel/8f9b8a4f31573f428f29ec0e884e6673
-// generatePrivateKey creates a RSA Private Key of specified byte size
-func generatePrivateKey(bitSize int) (*rsa.PrivateKey, error) {
-	// Private Key generation
-	privateKey, err := rsa.GenerateKey(rand.Reader, bitSize)
-	if err != nil {
-		return nil, err
-	}
-
-	// Validate Private Key
-	err = privateKey.Validate()
-	if err != nil {
-		return nil, err
-	}
-
-	return privateKey, nil
-}
-
-// encodePrivateKeyToPEM encodes Private Key from RSA to PEM format
-func encodePrivateKeyToPEM(privateKey *rsa.PrivateKey) []byte {
-	// Get ASN.1 DER format
-	privDER := x509.MarshalPKCS1PrivateKey(privateKey)
-
-	// pem.Block
-	privBlock := pem.Block{
-		Type:    "RSA PRIVATE KEY",
-		Headers: nil,
-		Bytes:   privDER,
-	}
-
-	// Private key in PEM format
-	privatePEM := pem.EncodeToMemory(&privBlock)
-
-	return privatePEM
-}
-
-// generatePublicKey take a rsa.PublicKey and return bytes suitable for writing to .pub file
-// returns in the format "ssh-rsa ..."
-func generatePublicKey(privatekey *rsa.PublicKey) ([]byte, error) {
-	publicRsaKey, err := ssh.NewPublicKey(privatekey)
-	if err != nil {
-		return nil, err
-	}
-
-	pubKeyBytes := ssh.MarshalAuthorizedKey(publicRsaKey)
-
-	return pubKeyBytes, nil
-}
-
-// writePemToFile writes keys to a file
-func writeKeyToFile(keyBytes []byte, saveFileTo string) error {
-	err := ioutil.WriteFile(saveFileTo, keyBytes, 0600)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// different source https://gist.github.com/sdorra/1c95de8cb80da31610d2ad767cd6f251
-
-func saveGobKey(fileName string, key interface{}) {
-	outFile, err := os.Create(fileName)
-	checkError(err)
-	defer outFile.Close()
-
-	encoder := gob.NewEncoder(outFile)
-	err = encoder.Encode(key)
-	checkError(err)
-	err = os.Chmod(fileName, 0600)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func savePEMKey(fileName string, key *rsa.PrivateKey) {
-	outFile, err := os.Create(fileName)
-	checkError(err)
-	defer outFile.Close()
-
-	var privateKey = &pem.Block{
-		Type:  "PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(key),
-	}
-
-	err = pem.Encode(outFile, privateKey)
-	checkError(err)
-	err = os.Chmod(fileName, 0600)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func savePublicPEMKey(fileName string, pubkey rsa.PublicKey) {
-	asn1Bytes, err := asn1.Marshal(pubkey)
-	checkError(err)
-
-	var pemkey = &pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: asn1Bytes,
-	}
-
-	pemfile, err := os.Create(fileName)
-	checkError(err)
-	defer pemfile.Close()
-
-	err = pem.Encode(pemfile, pemkey)
-	checkError(err)
-	err = os.Chmod(fileName, 0600)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func checkError(err error) {
-	if err != nil {
-		fmt.Println("Fatal error ", err.Error())
-		os.Exit(1)
-	}
-}
