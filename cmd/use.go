@@ -1,5 +1,5 @@
 /*
-Copyright © 2019 NAME HERE <EMAIL ADDRESS>
+Copyright © 2019 Zane Hitchcox zwhitchcox@gmail.com
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,7 +16,9 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"os"
@@ -25,11 +27,14 @@ import (
 	"runtime"
 	"strings"
 
+	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zwhitchcox/zetup/cmd/util"
 	"golang.org/x/crypto/ssh"
 	git "gopkg.in/src-d/go-git.v4"
 	ssh2 "gopkg.in/src-d/go-git.v4/plumbing/transport/ssh"
+	"gopkg.in/yaml.v2"
 )
 
 var pkgViper *viper.Viper
@@ -37,6 +42,14 @@ var pkgToInstall string
 
 type LinuxInfo struct {
 	Distro, Arch, Release, CodeName string
+}
+type ToLink struct {
+	Src, Target string
+}
+
+type TplInfo struct {
+	Home     string
+	ZetupDir string
 }
 
 // initCmd represents the init command
@@ -64,61 +77,30 @@ var useCmd = &cobra.Command{
 		if runtime.GOOS == "linux" {
 			var linuxInfo LinuxInfo
 			linuxInfo.Distro = getSystemInfo("lsb_release", "-ds", "distro")
-			if linuxInfo.Distro == "disco" && viper.GetBool("verbose") {
+			if linuxInfo.Distro == "disco" && mainViper.GetBool("verbose") {
 				log.Println("Disco ain't dead") // easter egg, idk
 			}
 			linuxInfo.Release = getSystemInfo("lsb_release", "-rs", "release")
 			linuxInfo.CodeName = getSystemInfo("lsb_release", "-cs", "release")
 			linuxInfo.Arch = getSystemInfo("uname", "-m", "architecture")
 
-			// check if there are any apt packages not already installed
-			aptPackages := pkgViper.GetStringSlice("apt")
-
-			aptPackagesAlreadyInstalled := viper.GetStringMap("installed-apt")
-			var toInstall []string
-			for _, pkg := range aptPackages {
-				if aptPackagesAlreadyInstalled[pkg] == nil {
-					toInstall = append(toInstall, pkg)
-				}
+			if linuxInfo.Distro == "Ubuntu" || linuxInfo.Distro == "Debian" {
+				ensureApt()
 			}
+			// todo CentOS, BSD rather than attempt this having no idea
+			// what I'm doing, I will leave this up to the community
+			// or at least wait until someone asks
 
-			if len(toInstall) > 0 {
-				if viper.GetBool("verbose") {
-					log.Printf("updating apt\n")
-				}
-				runCmd := exec.Command("sudo", "apt-get", "update", "-yqq")
-				runCmd.Stdout = os.Stdout
-				runCmd.Stdin = os.Stdin
-				runCmd.Stderr = os.Stderr
-				err := runCmd.Run()
-				if err != nil {
-					log.Println("Could not run apt-get update")
-					log.Fatal(err)
-				}
-
-				if viper.GetBool("verbose") {
-					log.Printf("installing %+v using apt\n", toInstall)
-				}
-				cmdArgs := append([]string{"apt-get", "install", "-yqq"}, toInstall...)
-				runCmd = exec.Command("sudo", cmdArgs...)
-				runCmd.Stdout = os.Stdout
-				runCmd.Stdin = os.Stdin
-				runCmd.Stderr = os.Stderr
-				err = runCmd.Run()
-				if err != nil {
-					log.Println("Could not run apt-get install")
-					log.Fatal(err)
-				}
-				for _, pkg := range toInstall {
-					viper.Set("installed-apt."+pkg, true)
-				}
-				viper.WriteConfig()
-			}
 		}
+		LinkFiles()
 
-		os.Exit(0)
-		// todo: init only if not current
-		runAnyFile("init")
+		useFile, err := FindFile(usePkgDir, "use", runtime.GOOS, LINUX_EXTENSIONS, mainViper)
+		if err == nil {
+
+		}
+		log.Printf("useFile = %+v\n", useFile)
+		mainViper.Set("use-pkg", usePkgDir)
+		mainViper.WriteConfig()
 
 		//if [[ $@ != "--no-star" ]];
 		//then
@@ -127,6 +109,98 @@ var useCmd = &cobra.Command{
 		//https://api.github.com/user/starred/zwhitchcox/zetup-config;
 		//fi
 	},
+}
+
+func LinkFiles() {
+	// link files
+	linkFirst := pkgViper.Get("link").([]interface{})
+
+	home, _ := homedir.Dir()
+	tplInfo := TplInfo{
+		home,
+		usePkgDir,
+	}
+
+	// get link files with executed templates
+	var toLinkFiles []ToLink
+	for _, toLink := range linkFirst {
+		toLinkMap := toLink.(map[interface{}]interface{})
+		linkOS := toLinkMap["os"].(string)
+		src := toLinkMap["src"].(string)
+		target := toLinkMap["target"].(string)
+		if src == "" || target == "" {
+			log.Fatal("all links must include a target and a src", toLink)
+		}
+		if linkOS == runtime.GOOS || linkOS == "" {
+			// if target exists, back it up
+			//log.Printf("zetup-bak = %+v\n", bakDir)
+			targetTmpl, err := template.New("target").Parse(target)
+			if err != nil {
+				log.Println("There was a problem with ", target)
+				panic(err)
+			}
+
+			srcTmpl, err := template.New("src").Parse(src)
+			if err != nil {
+				log.Println("There was a problem with ", src)
+				panic(err)
+			}
+
+			var targetTpl bytes.Buffer
+			if err := targetTmpl.Execute(&targetTpl, tplInfo); err != nil {
+				log.Println("There was a problem with ", target)
+				log.Fatal(err)
+			}
+			finalTarget := targetTpl.String()
+
+			var srcTpl bytes.Buffer
+			if err := srcTmpl.Execute(&srcTpl, tplInfo); err != nil {
+				log.Println("There was a problem with ", src)
+				log.Fatal(err)
+			}
+			finalSrc := srcTpl.String()
+			newToLink := ToLink{
+				Src:    string(finalSrc),
+				Target: string(finalTarget),
+			}
+			toLinkFiles = append(toLinkFiles, newToLink)
+		}
+	}
+
+	// first restore backup files before overwriting them again
+	RestoreBackupFiles()
+
+	// back files up first
+	var backedupFiles []BackupFileInfo
+	for _, toLinkFile := range toLinkFiles {
+		// back up all files to one single map
+		if util.Exists(toLinkFile.Target) {
+			// back up target
+			dat, err := ioutil.ReadFile(toLinkFile.Target)
+			check(err)
+			backupFileInfo := BackupFileInfo{
+				toLinkFile.Target,
+				string(dat),
+			}
+			backedupFiles = append(backedupFiles, backupFileInfo)
+		}
+	}
+	marshaled, err := yaml.Marshal(backedupFiles)
+	check(err)
+
+	backupFile := path.Join(zetupDir, ".bak.yaml")
+	backupWithHeader := []byte("# generated file do not edit\n" + string(marshaled))
+	err = ioutil.
+		WriteFile(backupFile, backupWithHeader, 0644)
+	check(err)
+
+	// then link the actual files
+	// we back up first in case something goes wrong
+	for _, toLinkFile := range toLinkFiles {
+		err := os.Remove(toLinkFile.Target)
+		err = os.Symlink(toLinkFile.Src, toLinkFile.Target)
+		check(err)
+	}
 }
 
 func getSystemInfo(bashcmd string, flags string, name string) string {
@@ -147,10 +221,56 @@ func init() {
 var usePkgDir string
 var usePkgDirParent string
 
+func ensureApt() {
+	// check if there are any apt packages not already installed
+	aptPackages := pkgViper.GetStringSlice("apt")
+
+	aptPackagesAlreadyInstalled := mainViper.GetStringMap("installed-apt")
+	var toInstall []string
+	for _, pkg := range aptPackages {
+		if aptPackagesAlreadyInstalled[pkg] == nil {
+			toInstall = append(toInstall, pkg)
+		}
+	}
+
+	if len(toInstall) > 0 {
+		if mainViper.GetBool("verbose") {
+			log.Printf("updating apt\n")
+		}
+		runCmd := exec.Command("sudo", "apt-get", "update", "-yqq")
+		runCmd.Stdout = os.Stdout
+		runCmd.Stdin = os.Stdin
+		runCmd.Stderr = os.Stderr
+		err := runCmd.Run()
+		if err != nil {
+			log.Println("Could not run apt-get update")
+			log.Fatal(err)
+		}
+
+		if mainViper.GetBool("verbose") {
+			log.Printf("installing %+v using apt\n", toInstall)
+		}
+		cmdArgs := append([]string{"apt-get", "install", "-yqq"}, toInstall...)
+		runCmd = exec.Command("sudo", cmdArgs...)
+		runCmd.Stdout = os.Stdout
+		runCmd.Stdin = os.Stdin
+		runCmd.Stderr = os.Stderr
+		err = runCmd.Run()
+		if err != nil {
+			log.Println("Could not run apt-get install")
+			log.Fatal(err)
+		}
+		for _, pkg := range toInstall {
+			mainViper.Set("installed-apt."+pkg, true)
+		}
+		mainViper.WriteConfig()
+	}
+}
+
 func ensureRepo() {
 	splitPath := strings.Split(pkgToInstall, "/")
 	if len(splitPath) == 1 {
-		splitPath = []string{"github.com", viper.GetString("github-username"), splitPath[0]}
+		splitPath = []string{"github.com", mainViper.GetString("github-username"), splitPath[0]}
 	}
 	if len(splitPath) != 3 || splitPath[0] != "github.com" {
 		log.Fatal("Only github is supported for now.")
@@ -164,20 +284,20 @@ func ensureRepo() {
 	}
 
 	if _, err := os.Stat(usePkgDir); os.IsNotExist(err) {
-		if viper.GetBool("verbose") {
+		if mainViper.GetBool("verbose") {
 			log.Println(path.Join(splitPath...) + " not found, cloning...")
 		}
 
 		var url string
 		username := splitPath[1]
-		githubUsername := viper.GetString("github-username")
+		githubUsername := mainViper.GetString("github-username")
 		if githubUsername != username {
 			url = "https://github.com/" + username + "/" + splitPath[2] + ".git"
 		} else {
 			url = "git@github.com:" + username + "/" + splitPath[2] + ".git"
 		}
 
-		privateKeyFile := viper.GetString("private-key-file")
+		privateKeyFile := mainViper.GetString("private-key-file")
 
 		pem, _ := ioutil.ReadFile(privateKeyFile)
 		signer, _ := ssh.ParsePrivateKey(pem)
@@ -198,28 +318,19 @@ func ensureRepo() {
 	}
 }
 
-func runAnyFile(fileSuffix string) {
-	cmdFile := pkgViper.GetString(runtime.GOOS + "-" + fileSuffix)
-	if cmdFile == "" {
-		log.Fatal("This zetup package does not contain a `" + fileSuffix + "` file for your OS (" + runtime.GOOS + ")")
-	}
-	cmdFilePath := usePkgDir + string(os.PathSeparator) + cmdFile
-	if runtime.GOOS == "linux" {
-	}
-	runBashFile(cmdFilePath)
-}
-
-func runBashFile(filePath string) {
-	err := os.Chmod(filePath, 0755)
+func runFile(cmdFilePath string) {
+	err := os.Chmod(cmdFilePath, 0755)
 	if err != nil {
 		fmt.Println(err)
 	}
-	runCmd := exec.Command("/bin/sh", filePath)
+
+	runCmd := exec.Command(cmdFilePath)
+	runCmd.Env = append(os.Environ(), "ZETUP_PKG_DIR="+usePkgDir)
 	runCmd.Stdout = os.Stdout
 	runCmd.Stdin = os.Stdin
 	runCmd.Stderr = os.Stderr
 	err = runCmd.Run()
 	if err != nil {
-		log.Fatalf("%s %s\n", filePath, err)
+		log.Fatalf("%s %s\n", cmdFilePath, err)
 	}
 }
