@@ -2,7 +2,10 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"os"
+	"os/exec"
 	"path"
 
 	"github.com/spf13/viper"
@@ -13,6 +16,8 @@ type BackupFileInfo struct {
 	Location string `yaml:"location"`
 	Contents string `yaml:"contents"`
 }
+
+var err error
 
 func FindFile(
 	dir string,
@@ -59,5 +64,22 @@ func FindFile(
 		return "", errors.New("no " + prefix + " file found")
 	} else {
 		return cmdFilePath, nil
+	}
+}
+
+func runFile(cmdFilePath string) {
+	err := os.Chmod(cmdFilePath, 0755)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	runCmd := exec.Command(cmdFilePath)
+	runCmd.Env = append(os.Environ(), "ZETUP_PKG_DIR="+usePkgDir)
+	runCmd.Stdout = os.Stdout
+	runCmd.Stdin = os.Stdin
+	runCmd.Stderr = os.Stderr
+	err = runCmd.Run()
+	if err != nil {
+		log.Fatalf("%s %s\n", cmdFilePath, err)
 	}
 }

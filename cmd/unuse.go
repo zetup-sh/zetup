@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"runtime"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
@@ -36,31 +37,34 @@ var unuseCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(unuseCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// unuseCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// unuseCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 func Unuse() {
 	RestoreBackupFiles()
+	unuseFile, err := FindFile(usePkgDir, "unuse", runtime.GOOS, LINUX_EXTENSIONS, mainViper)
+	if err == nil {
+		runFile(unuseFile)
+	}
 }
 
 func RestoreBackupFiles() {
-	// restore linked files
-	dat, err := ioutil.ReadFile(path.Join(zetupDir, ".bak.yaml"))
+	files, err := ioutil.ReadDir(bakDir)
 	check(err)
-	var backedupFiles []BackupFileInfo
-	yaml.Unmarshal(dat, &backedupFiles)
-	for _, backedupFile := range backedupFiles {
-		err = os.Remove(backedupFile.Location)
+	var bakupFiles []string
+	for _, file := range files {
+		bakupFiles = append(bakupFiles, path.Join(bakDir, file.Name()))
+	}
+
+	for _, bakupFile := range bakupFiles {
+		// restore backups of linked files
+		dat, err := ioutil.ReadFile(bakupFile)
 		check(err)
-		ioutil.WriteFile(backedupFile.Location, []byte(backedupFile.Contents), 0644)
+		var backedupFiles []BackupFileInfo
+		yaml.Unmarshal(dat, &backedupFiles)
+		for _, backedupFile := range backedupFiles {
+			err = os.Remove(backedupFile.Location)
+			check(err)
+			ioutil.WriteFile(backedupFile.Location, []byte(backedupFile.Contents), 0644)
+		}
 	}
 }

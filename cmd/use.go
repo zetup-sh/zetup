@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -52,6 +51,8 @@ type TplInfo struct {
 	ZetupDir string
 }
 
+var linuxInfo LinuxInfo
+
 // initCmd represents the init command
 var useCmd = &cobra.Command{
 	Use:   "use",
@@ -75,45 +76,68 @@ var useCmd = &cobra.Command{
 
 		// install linux
 		if runtime.GOOS == "linux" {
-			var linuxInfo LinuxInfo
 			linuxInfo.Distro = getSystemInfo("lsb_release", "-ds", "distro")
-			if linuxInfo.Distro == "disco" && mainViper.GetBool("verbose") {
-				log.Println("Disco ain't dead") // easter egg, idk
-			}
 			linuxInfo.Release = getSystemInfo("lsb_release", "-rs", "release")
 			linuxInfo.CodeName = getSystemInfo("lsb_release", "-cs", "release")
 			linuxInfo.Arch = getSystemInfo("uname", "-m", "architecture")
 
 			if linuxInfo.Distro == "Ubuntu" || linuxInfo.Distro == "Debian" {
-				ensureApt()
+				ensureApt(pkgViper)
 			}
-			// todo CentOS, BSD rather than attempt this having no idea
-			// what I'm doing, I will leave this up to the community
-			// or at least wait until someone asks
-
 		}
-		LinkFiles()
+		LinkFiles(pkgViper, "main-backup.bak")
 
 		useFile, err := FindFile(usePkgDir, "use", runtime.GOOS, LINUX_EXTENSIONS, mainViper)
 		if err == nil {
-
+			runFile(useFile)
 		}
-		log.Printf("useFile = %+v\n", useFile)
+
+		useSubpkgs()
+
 		mainViper.Set("use-pkg", usePkgDir)
 		mainViper.WriteConfig()
-
-		//if [[ $@ != "--no-star" ]];
-		//then
-		//curl -s -u $USERNAME:$ZETUP_GITHUB_TOKEN \
-		//--request PUT \
-		//https://api.github.com/user/starred/zwhitchcox/zetup-config;
-		//fi
 	},
 }
 
-func LinkFiles() {
+func useSubpkgs() {
+	subpkgDirs := getListOfSubpkgs()
+	for _, subpkgDir := range subpkgDirs {
+		subpkgViper := viper.New()
+		subpkgViper.AddConfigPath(subpkgDir)
+		subpkgViper.SetConfigName("config")
+		_ = subpkgViper.ReadInConfig()
+		if runtime.GOOS == "linux" {
+			ensureApt(subpkgViper)
+			base := path.Base(subpkgDir)
+			LinkFiles(subpkgViper, base+".sub.bak")
+			file, err := FindFile(subpkgDir, "use", runtime.GOOS, LINUX_EXTENSIONS, subpkgViper)
+			if err == nil {
+				runFile(file)
+			}
+		}
+
+	}
+}
+
+func getListOfSubpkgs() []string {
+	subpkgDir := path.Join(usePkgDir, "subpkg")
+	files, err := ioutil.ReadDir(subpkgDir)
+	check(err)
+	var subpkgDirs []string
+	for _, file := range files {
+		if file.IsDir() {
+			subpkgDirs = append(subpkgDirs, path.Join(subpkgDir, file.Name()))
+		}
+	}
+	return subpkgDirs
+}
+
+func LinkFiles(curViper *viper.Viper, bakupName string) {
 	// link files
-	linkFirst := pkgViper.Get("link").([]interface{})
+	linkFirst, ok := curViper.Get("link").([]interface{})
+	if !ok {
+		return
+	}
 
 	home, _ := homedir.Dir()
 	tplInfo := TplInfo{
@@ -132,8 +156,6 @@ func LinkFiles() {
 			log.Fatal("all links must include a target and a src", toLink)
 		}
 		if linkOS == runtime.GOOS || linkOS == "" {
-			// if target exists, back it up
-			//log.Printf("zetup-bak = %+v\n", bakDir)
 			targetTmpl, err := template.New("target").Parse(target)
 			if err != nil {
 				log.Println("There was a problem with ", target)
@@ -188,7 +210,7 @@ func LinkFiles() {
 	marshaled, err := yaml.Marshal(backedupFiles)
 	check(err)
 
-	backupFile := path.Join(zetupDir, ".bak.yaml")
+	backupFile := path.Join(bakDir, bakupName)
 	backupWithHeader := []byte("# generated file do not edit\n" + string(marshaled))
 	err = ioutil.
 		WriteFile(backupFile, backupWithHeader, 0644)
@@ -221,9 +243,9 @@ func init() {
 var usePkgDir string
 var usePkgDirParent string
 
-func ensureApt() {
+func ensureApt(vip *viper.Viper) {
 	// check if there are any apt packages not already installed
-	aptPackages := pkgViper.GetStringSlice("apt")
+	aptPackages := vip.GetStringSlice("apt")
 
 	aptPackagesAlreadyInstalled := mainViper.GetStringMap("installed-apt")
 	var toInstall []string
@@ -315,22 +337,5 @@ func ensureRepo() {
 		if err != nil {
 			log.Fatal(err)
 		}
-	}
-}
-
-func runFile(cmdFilePath string) {
-	err := os.Chmod(cmdFilePath, 0755)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	runCmd := exec.Command(cmdFilePath)
-	runCmd.Env = append(os.Environ(), "ZETUP_PKG_DIR="+usePkgDir)
-	runCmd.Stdout = os.Stdout
-	runCmd.Stdin = os.Stdin
-	runCmd.Stderr = os.Stderr
-	err = runCmd.Run()
-	if err != nil {
-		log.Fatalf("%s %s\n", cmdFilePath, err)
 	}
 }

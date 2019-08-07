@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -57,6 +58,8 @@ var publicKeyFile string
 var githubToken string
 var pkgDir string
 var verbose bool
+
+var rcDir string
 
 func init() {
 	mainViper = viper.New()
@@ -197,6 +200,12 @@ func initConfig() {
 		mainViper.Set("private-key-file", privateKeyFile)
 	}
 
+	rcDir = path.Join(zetupDir, "rc")
+	_ = os.Mkdir(rcDir, 0755)
+
+	bakDir = path.Join(zetupDir, ".bak")
+	_ = os.Mkdir(bakDir, 0755)
+
 	ensureToken()
 	getUserInfo()
 	writeGitConfig()
@@ -287,6 +296,7 @@ func addPublicKeyToGithub(pubKey string, githubToken string) {
 
 func check(err error) {
 	if err != nil {
+		debug.PrintStack()
 		log.Fatal(err)
 	}
 }
