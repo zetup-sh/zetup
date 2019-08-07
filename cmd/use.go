@@ -14,7 +14,7 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zetup/zetup/cmd/util"
+	"github.com/zetup-sh/zetup/cmd/util"
 	"golang.org/x/crypto/ssh"
 	git "gopkg.in/src-d/go-git.v4"
 	ssh2 "gopkg.in/src-d/go-git.v4/plumbing/transport/ssh"
@@ -72,12 +72,13 @@ var useCmd = &cobra.Command{
 				ensureSnap(pkgViper)
 			}
 		}
-		LinkFiles(pkgViper, "main-backup.bak")
 
 		useFile, err := FindFile(usePkgDir, "use", runtime.GOOS, LINUX_EXTENSIONS, mainViper)
 		if err == nil {
 			runFile(useFile)
 		}
+
+		LinkFiles(pkgViper, "main-backup.bak")
 
 		useSubpkgs()
 
@@ -97,11 +98,11 @@ func useSubpkgs() {
 			ensureApt(subpkgViper)
 			ensureSnap(subpkgViper)
 			base := path.Base(subpkgDir)
-			LinkFiles(subpkgViper, base+".sub.bak")
-			file, err := FindFile(subpkgDir, "use", runtime.GOOS, LINUX_EXTENSIONS, subpkgViper)
+			useFile, err := FindFile(subpkgDir, "use", runtime.GOOS, LINUX_EXTENSIONS, subpkgViper)
 			if err == nil {
-				runFile(file)
+				runFile(useFile)
 			}
+			LinkFiles(subpkgViper, base+".sub.bak")
 		}
 
 	}
@@ -333,23 +334,28 @@ func ensureRepo() {
 		var url string
 		username := splitPath[1]
 		githubUsername := mainViper.GetString("github-username")
+		log.Println("username", username)
+		var r *git.Repository
 		if githubUsername != username {
 			url = "https://github.com/" + username + "/" + splitPath[2] + ".git"
+			r, err = git.PlainClone(usePkgDir, false, &git.CloneOptions{
+				URL:               url,
+				RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
+			})
 		} else {
+			privateKeyFile := mainViper.GetString("private-key-file")
+
+			pem, _ := ioutil.ReadFile(privateKeyFile)
+			signer, _ := ssh.ParsePrivateKey(pem)
+			auth := &ssh2.PublicKeys{User: "git", Signer: signer}
 			url = "git@github.com:" + username + "/" + splitPath[2] + ".git"
+			r, err = git.PlainClone(usePkgDir, false, &git.CloneOptions{
+				URL:               url,
+				RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
+				Auth:              auth,
+			})
 		}
 
-		privateKeyFile := mainViper.GetString("private-key-file")
-
-		pem, _ := ioutil.ReadFile(privateKeyFile)
-		signer, _ := ssh.ParsePrivateKey(pem)
-		auth := &ssh2.PublicKeys{User: "git", Signer: signer}
-
-		r, err := git.PlainClone(usePkgDir, false, &git.CloneOptions{
-			URL:               url,
-			RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
-			Auth:              auth,
-		})
 		if err != nil {
 			log.Fatal(err)
 		}

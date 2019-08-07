@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zetup/zetup/cmd/util"
+	"github.com/zetup-sh/zetup/cmd/util"
 )
 
 // initCmd represents the init command

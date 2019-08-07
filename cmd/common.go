@@ -74,7 +74,7 @@ func runFile(cmdFilePath string) {
 	}
 
 	runCmd := exec.Command(cmdFilePath)
-	runCmd.Env = append(os.Environ(), "ZETUP_PKG_DIR="+usePkgDir)
+	runCmd.Env = append(os.Environ(), "ZETUP_USE_PKG="+usePkgDir)
 	runCmd.Stdout = os.Stdout
 	runCmd.Stdin = os.Stdin
 	runCmd.Stderr = os.Stderr

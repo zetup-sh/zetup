@@ -20,7 +20,7 @@ import (
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/spf13/cobra"
-	"github.com/zetup/zetup/cmd/util"
+	"github.com/zetup-sh/zetup/cmd/util"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
@@ -393,6 +393,7 @@ func ensureToken() {
 	if password == "" {
 		password = util.GetPassword("Github Password: ")
 	}
+	log.Println("password", password)
 
 	// send token request
 	data := TokenPayload{
@@ -422,6 +423,7 @@ func ensureToken() {
 	}
 
 	req.SetBasicAuth(githubUsername, password)
+	log.Println("sending", githubUsername, password)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
