@@ -28,7 +28,7 @@ var envCmd = &cobra.Command{
 					envStr += strings.ToUpper(strings.ReplaceAll(key, "-", "_")) + "=" + v + "\n"
 				}
 			}
-			envStr += "# add eval `zetup env` to your .bashrc"
+			envStr += "# add eval `zetup env` to your .bashrc\n"
 		}
 		fmt.Fprintf(os.Stdout, envStr)
 	},

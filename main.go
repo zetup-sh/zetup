@@ -1,6 +1,6 @@
 package main
 
-import "github.com/zwhitchcox/zetup/cmd"
+import "github.com/zetup/zetup/cmd"
 
 func main() {
 	cmd.Execute()

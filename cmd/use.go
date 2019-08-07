@@ -1,18 +1,3 @@
-/*
-Copyright © 2019 Zane Hitchcox zwhitchcox@gmail.com
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package cmd
 
 import (
@@ -29,7 +14,7 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zwhitchcox/zetup/cmd/util"
+	"github.com/zetup/zetup/cmd/util"
 	"golang.org/x/crypto/ssh"
 	git "gopkg.in/src-d/go-git.v4"
 	ssh2 "gopkg.in/src-d/go-git.v4/plumbing/transport/ssh"
@@ -83,6 +68,8 @@ var useCmd = &cobra.Command{
 
 			if linuxInfo.Distro == "Ubuntu" || linuxInfo.Distro == "Debian" {
 				ensureApt(pkgViper)
+				// apt installs snapd
+				ensureSnap(pkgViper)
 			}
 		}
 		LinkFiles(pkgViper, "main-backup.bak")
@@ -108,6 +95,7 @@ func useSubpkgs() {
 		_ = subpkgViper.ReadInConfig()
 		if runtime.GOOS == "linux" {
 			ensureApt(subpkgViper)
+			ensureSnap(subpkgViper)
 			base := path.Base(subpkgDir)
 			LinkFiles(subpkgViper, base+".sub.bak")
 			file, err := FindFile(subpkgDir, "use", runtime.GOOS, LINUX_EXTENSIONS, subpkgViper)
@@ -242,6 +230,38 @@ func init() {
 
 var usePkgDir string
 var usePkgDirParent string
+
+func ensureSnap(vip *viper.Viper) {
+	// check if there are any apt packages not already installed
+	snapPackages := vip.GetStringSlice("snap")
+	if len(snapPackages) == 0 {
+		return
+	}
+
+	snapPackagesAlreadyInstalled := mainViper.GetStringMap("installed-snap")
+	for _, pkg := range snapPackages {
+		if snapPackagesAlreadyInstalled[pkg] == nil {
+			if mainViper.GetBool("verbose") {
+				log.Printf("installing %+v using snap\n", pkg)
+			}
+			cmdArgs := append([]string{"snap", "install", "--classic"}, pkg)
+			runCmd := exec.Command("sudo", cmdArgs...)
+			runCmd.Stdout = os.Stdout
+			runCmd.Stdin = os.Stdin
+			runCmd.Stderr = os.Stderr
+			err = runCmd.Run()
+			if err != nil {
+				log.Println("Could not run snap install")
+				log.Fatal(err)
+			}
+			if mainViper.GetBool("verbose") {
+				log.Println("successfully installed snap", pkg)
+			}
+			mainViper.Set("installed-snap."+pkg, true)
+			mainViper.WriteConfig()
+		}
+	}
+}
 
 func ensureApt(vip *viper.Viper) {
 	// check if there are any apt packages not already installed

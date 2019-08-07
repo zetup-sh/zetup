@@ -20,7 +20,7 @@ import (
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/spf13/cobra"
-	"github.com/zwhitchcox/zetup/cmd/util"
+	"github.com/zetup/zetup/cmd/util"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
@@ -319,13 +319,16 @@ type UserInfo struct {
 var userInfo UserInfo
 
 func getUserInfo() {
-	if userInfoGotten, ok := mainViper.Get("user").(UserInfo); ok {
-		userInfo = userInfoGotten // is there a better way to do this?
-		return
-	}
+	viperUserInfo := mainViper.GetStringMapString("user")
+	userInfo.Email = viperUserInfo["email"]
+	userInfo.Name = viperUserInfo["name"]
+	userInfo.GithubUsername = mainViper.GetString("github-username")
+
 	if userInfo.GithubUsername != "" && userInfo.Name != "" && userInfo.Email != "" {
 		return
 	}
+
+	log.Println("getting from api")
 
 	// get info with personal access token
 	req, err := http.NewRequest("GET", "https://api.github.com/user", nil)
