@@ -17,9 +17,9 @@ const App: React.FC = () => {
 
   const base = "https://raw.github.com/zetup-sh/zetup/master/tools"
   const cmds = {
-    "curl": `sh -c "$(curl -fsSL ${base}/install.sh)"`,
-    "wget": `sh -c "$(wget ${base}/install.sh -O -)"`,
-    "powershell": `Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('${base}/install.ps1'))`,
+    curl: `sh -c '$(curl -fsSL ${base}/install.sh)'`,
+    wget: `sh -c '$(wget ${base}/install.sh -O -)'`,
+    powershell: `Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('${base}/install.ps1'))`,
   }
 
   useEffect(() => {
@@ -37,8 +37,11 @@ const App: React.FC = () => {
     const OS = getOS()
     setCurCmd(OS === "Windows" ? "powershell" : "curl")
   }, [])
+
+  const env = curTag === "" || curCmd === "powershell" ? "" : `env ZETUP_RELEASE="${curTag}" `
+
   const copyCmd = () => {
-    copyTextToClipboard(cmds[curCmd])
+    copyTextToClipboard(env + cmds[curCmd])
   }
 
   return (
@@ -82,7 +85,7 @@ const App: React.FC = () => {
         overflow: "hidden",
         textOverflow: "ellipsis",
       }}>
-      <code style={{margin: "0 auto"}} id="install-cmd">{cmds[curCmd]}</code>
+      <code style={{margin: "0 auto"}} id="install-cmd">{env + cmds[curCmd]}</code>
       </div>
       <div style={{
         display: "flex",
