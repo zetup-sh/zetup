@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/bin/bash
+
 
 package=$1
 if [[ -z "$package" ]]; then
@@ -18,8 +19,9 @@ do
   output_name=$package_name'-'$GOOS'-'$GOARCH
   if [ $GOOS = "windows" ]; then
     output_name+='.exe'
-  fi  
+  fi
 
+  echo "Running env GOOS=$GOOS GOARCH=$GOARCH go build -o build/$output_name $package"
   env GOOS=$GOOS GOARCH=$GOARCH go build -o build/$output_name $package
   if [ $? -ne 0 ]; then
     echo 'An error has occurred! Aborting the script execution...'

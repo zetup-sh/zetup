@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zetup-sh/zetup/cmd/util"
 )
 
 // initCmd represents the init command
@@ -63,7 +63,10 @@ func deleteGithubToken() {
 	password := viper.GetString("github-password")
 	if password == "" {
 		log.Println("Sorry, I can only delete the personal access token with your password.")
-		password = util.GetPassword("Github Password: ")
+		password, err = speakeasy.Ask("Github Password: ")
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	req, err := http.NewRequest("DELETE", "https://api.github.com/authorizations/"+githubTokenId, nil)
 	if err != nil {

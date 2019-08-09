@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bgentry/speakeasy"
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/spf13/cobra"
 	"github.com/zetup-sh/zetup/cmd/util"
@@ -391,7 +392,10 @@ func ensureToken() {
 
 	password := mainViper.GetString("github-password")
 	if password == "" {
-		password = util.GetPassword("Github Password: ")
+		password, err = speakeasy.Ask("Github Password: ")
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	log.Println("password", password)
 

@@ -4,7 +4,8 @@ import './App.scss';
 
 const OS = getOS()
 const cmds = {
-  "curl": "sh -c \"$(curl -fsSL https://raw.github.com/zetup-sh/zetup/master/tools/install.sh)\"",
+  "curl": "curl -L -O https://raw.github.com/zetup-sh/zetup/build/\"\n",
+
   "wget": "sh -c \"$(wget https://raw.github.com/zeutp-sh/zetup/master/tools/install.sh -O -)\"",
   "powershell": "Coming soon to a terminal near you!",
 }
@@ -21,7 +22,7 @@ const App: React.FC = () => {
     <div id="fog" />
     <h1>Z</h1>
     <div className="install-menu">
-    <h2>Installation</h2>
+    <h3>Installation</h3>
     <div className="tab">
       {Object.entries(cmds).map(([label]) => (
         <button
