@@ -1,18 +1,42 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import './App.scss';
 
 
-const OS = getOS()
-const cmds = {
-  "curl": "curl -L -O https://raw.github.com/zetup-sh/zetup/build/\"\n",
-
-  "wget": "sh -c \"$(wget https://raw.github.com/zeutp-sh/zetup/master/tools/install.sh -O -)\"",
-  "powershell": "Coming soon to a terminal near you!",
+const osMap = {
+  "Windows": "windows",
+  "Linux": "linux",
+  "Mac OS": "darwin",
 }
 
-
 const App: React.FC = () => {
-  const [curCmd, setCurCmd] = useState(OS === "Windows" ? "powershell" : "curl")
+  const [curCmd, setCurCmd] = useState()
+  const [curArch, setCurArch] = useState("amd64")
+  const [curTag, setCurTag] = useState("0.0.1")
+  const [downloadEnd, setDownloadEnd] = useState("")
+  // https://github.com/zetup-sh/zetup/releases/download/0.0.1-alpha/zetup-darwin-amd64
+
+  const base = "https://raw.github.com/zetup-sh/zetup/master/tools"
+  const cmds = {
+    "curl": `sh -c "$(curl -fsSL ${base}/install.sh)"`,
+    "wget": `sh -c "$(wget ${base}/install.sh -O -)"`,
+    "powershell": `Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('${base}/install.ps1'))`,
+  }
+
+  useEffect(() => {
+    ;(async () => {
+      const tagName = await fetch("https://api.github.com/repos/zetup-sh/zetup/releases")
+        .then(resp => resp.json())
+        .then(releases => releases[0].tag_name)
+      setCurTag(tagName)
+    })()
+  }, [])
+
+  // use effect so it doesn't add the wrong .active class to
+  // installation method tab
+  useEffect(() => {
+    const OS = getOS()
+    setCurCmd(OS === "Windows" ? "powershell" : "curl")
+  }, [])
   const copyCmd = () => {
     copyTextToClipboard(cmds[curCmd])
   }
@@ -20,10 +44,11 @@ const App: React.FC = () => {
   return (
     <div>
     <div id="fog" />
-    <h1>Z</h1>
+    <h1>Zup</h1>
+    <h2 className="tagline">automate your development setup</h2> */}
     <div className="install-menu">
     <h3>Installation</h3>
-    <div className="tab">
+    <div className="tab top">
       {Object.entries(cmds).map(([label]) => (
         <button
           key={label}
@@ -32,12 +57,44 @@ const App: React.FC = () => {
         {label}
        </button>
       ))}
+      <div style={{
+        display: "flex",
+        flex: "1",
+      }} />
+      {/* <button
+        className={"tablinks"+ (curArch === "amd64" ? " active" : "")}
+        onClick={()=> setCurArch("amd64")}>
+          amd64
+      </button>
+      <button
+        className={"tablinks"+ (curArch === "i386" ? " active" : "")}
+        onClick={()=> setCurArch("i386")}>
+          i386
+      </button> */}
     </div>
     <div className="tabcontent">
-      <code id="install-cmd">{cmds[curCmd]}</code>
-      {curCmd !== "powershell" && (
-        <button className="btn" onClick={copyCmd}><i className="fa fa-copy"></i></button>
-      )}
+      <div style={{
+        display: "flex",
+        width: "100%",
+      }}>
+      <div style={{
+        flex: 10,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }}>
+      <code style={{margin: "0 auto"}} id="install-cmd">{cmds[curCmd]}</code>
+      </div>
+      <div style={{
+        display: "flex",
+        flex: 1,
+      }} />
+      <div style={{
+        display: "flex",
+        flex: 1,
+      }}>
+      <button className="btn" onClick={copyCmd}><i className="fa fa-copy"></i></button>
+      </div>
+      </div>
     </div>
     </div>
     </div>
@@ -99,4 +156,8 @@ function copyTextToClipboard(text) {
   }, function(err) {
     console.error('Async: Could not copy text: ', err);
   });
+}
+function is64() {
+  return  (navigator.userAgent.indexOf("WOW64") != -1 ||
+    navigator.userAgent.indexOf("Win64") != -1 )
 }

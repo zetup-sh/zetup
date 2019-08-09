@@ -5,3 +5,9 @@ build:
 .PHONY: run
 run:
 	go run *.go
+
+
+.PHONY: publish-site
+publish-site:
+	yarn --cwd ./site build
+	yarn --cwd ./site pub

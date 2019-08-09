@@ -1,11 +1,12 @@
 * { padding: 0; margin: 0; box-sizing: border-box; }
-body {
+body, button {
   background-color: black;
-  font-family: "Fira Sans", Arial, Helvetica, sans-serif;
+  font-family: "Fira Code", Arial, Helvetica, sans-serif;
 }
 
 code {
   font-family: "Fira Code", "Courier New", Courier, monospace;
+  text-align: left
 }
 
 
@@ -104,11 +105,15 @@ $colorB: rgba(255, 240, 246, 0);
   margin: 70px auto 0px;
 }
 
+
 h2.tagline {
   text-align: center;
   color: white;
+  font-style: italic;
+  opacity: .8;
   font-family: "Fira Code", Arial, Helvetica, sans-serif;
-  margin: 0px 0px 30px;
+  margin: 0px auto 30px;
+  max-width:80%;
   font-size: 2em;
 }
 
@@ -123,6 +128,9 @@ h3 {
   overflow: hidden;
   border: 1px solid #ccc;
   background-color: #f1f1f1;
+  display: flex;
+}
+.tab.top {
   border-radius: 10px 10px 0px 0px;
 }
 
