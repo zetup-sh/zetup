@@ -1,0 +1,169 @@
+* { padding: 0; margin: 0; box-sizing: border-box; }
+body {
+  background-color: black;
+  font-family: "Fira Sans", Arial, Helvetica, sans-serif;
+}
+
+code {
+  font-family: "Fira Code", "Courier New", Courier, monospace;
+}
+
+
+
+/*Neon*/
+h1 {
+  text-align: center;
+  font-size: 12em;
+  margin: 70px 0 20px 0;
+  text-decoration: none;
+  -webkit-transition: all 0.5s;
+  -moz-transition: all 0.5s;
+  transition: all 0,h
+  .5s;
+}
+
+h1 {
+  color: #fff;
+  font-family: Monoton;
+  font-weight: normal;
+  -webkit-animation: neon1 1.5s ease-in-out infinite alternate;
+  -moz-animation: neon1 1.5s ease-in-out infinite alternate;
+  animation: neon1 1.5s ease-in-out infinite alternate;
+}
+
+
+$neonsign: hsl(334, 100%, 80%);
+
+@keyframes neon1 {
+  from {
+    text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #fff, 0 0 40px $neonsign, 0 0 70px $neonsign, 0 0 80px $neonsign, 0 0 100px $neonsign, 0 0 150px $neonsign;
+  }
+  to {
+    text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #fff, 0 0 20px $neonsign, 0 0 35px $neonsign, 0 0 40px $neonsign, 0 0 50px $neonsign, 0 0 75px $neonsign;
+  }
+}
+
+
+@keyframes neon1 {
+  from {
+    text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #fff, 0 0 40px $neonsign, 0 0 70px $neonsign, 0 0 80px $neonsign, 0 0 100px $neonsign, 0 0 150px $neonsign;
+  }
+  to {
+    text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #fff, 0 0 20px $neonsign, 0 0 35px $neonsign, 0 0 40px $neonsign, 0 0 50px $neonsign, 0 0 75px $neonsign;
+  }
+}
+
+
+
+
+//Dimensions
+$height:100%;
+$width:100%;
+
+//Colors
+$colorA: rgba(255, 240, 246,.2);
+$colorB: rgba(255, 240, 246, 0);
+
+
+#fog {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  opacity: .4;
+  pointer-events: none;
+  &:before, &:after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%;
+    width: 500%;
+    background-size: contain;
+    background-position: center;
+    background-repeat: repeat-x;
+  }
+  &:before {
+    background-image: url('https://res.cloudinary.com/dkr52htco/image/upload/v1536173269/fog-1.png');
+    animation: drift 240s linear 0s infinite;
+  }
+  &:after {
+    background-image: url('https://res.cloudinary.com/dkr52htco/image/upload/v1536173269/fog-2.png');
+    animation: drift 100s linear 0s infinite;
+  }
+  @keyframes drift {
+    from { transform: translate3d(0, 0, 0); }
+    to { transform: translate3d(-200vw, 0, 0); }
+  }
+}
+
+.install-menu {
+  width: 80%;
+  min-width: 400px;
+  margin: 70px auto 0px;
+}
+
+h2 {
+  text-align: center;
+  color: white;
+  font-family: "Fira Code", Arial, Helvetica, sans-serif;
+  margin: 30px 0px;
+  font-size: 2.5em;
+}
+.tab {
+
+  overflow: hidden;
+  border: 1px solid #ccc;
+  background-color: #f1f1f1;
+  border-radius: 10px 10px 0px 0px;
+}
+
+/* Style the buttons inside the tab */
+.tab button {
+  background-color: inherit;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  transition: 0.3s;
+  font-size: 17px;
+}
+
+/* Change background color of buttons on hover */
+.tab button:hover {
+  background-color: #ddd;
+}
+
+/* Create an active/current tablink class */
+.tab button.active {
+  background-color: #ccc;
+}
+
+/* Style the tab content */
+.tabcontent {
+  padding: 20px 10px;
+  border: 1px solid #ccc;
+  border-top: none;
+  color: white;
+  background: rgba(255, 255, 255, .1);
+  border-radius: 0px 0px 10px 10px;
+  text-align: center;
+}
+
+.btn {
+  background-color: rgb(255, 128, 183);
+ /* Blue background */
+  border: none; /* Remove borders */
+  border-radius: 9px;
+  color: white; /* White text */
+  padding: 6px 8px; /* Some padding */
+  margin: 0 10px;
+  font-size: 20px; /* Set a font size */
+  cursor: pointer; /* Mouse pointer on hover */
+}
+
+/* Darker background on mouse-over */
+.btn:hover {
+  background-color: #FF1177;
+}
