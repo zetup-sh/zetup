@@ -10,4 +10,4 @@ run:
 .PHONY: publish-site
 publish-site:
 	yarn --cwd ./site build
-	yarn --cwd ./site pub
+	scp -r ./site/build/* 192.168.1.68:/var/www/zetup.sh/html

@@ -80,7 +80,7 @@ $colorB: rgba(255, 240, 246, 0);
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  opacity: .4;
+  opacity: .3;
   pointer-events: none;
   &:before, &:after {
     content: "";
@@ -103,7 +103,7 @@ $colorB: rgba(255, 240, 246, 0);
   @keyframes drift {
     from { transform: translate3d(0, 0, 0); }
     to { transform: translate3d(-200vw, 0, 0); }
-  }
+ }
 }
 
 .install-menu {

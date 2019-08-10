@@ -31,6 +31,7 @@ then
 fi
 
 
+echo "$ZETUP_RELEASE, $ZETUP_ARCH, $ZETUP_OS"
 
 url="https://github.com/zetup-sh/zetup/releases/download/$ZETUP_RELEASE/zetup-$ZETUP_OS-$ZETUP_ARCH"
 
