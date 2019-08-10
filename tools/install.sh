@@ -1,34 +1,26 @@
 #!/bin/bash
+set -e
 
 echo "installing zetup..."
-# have to manually specify the release
-# as of now, only have prelease, and I don't
-# really feel like writing a json parser
-# just for pre production
-if [ -z "$ZETUP_RELEASE" ]
-then
-  echo "You must manually set the release for now :("
-  exit 1
-fi
-
-# set architecture if not already set
-if [ -z "$ZETUP_ARCH" ]
-then
-  if [[ "$(uname -as)" == *"x86_64"* ]]
-  then export ZETUP_ARCH="amd64"
-  else export ZETUP_ARCH="i386"
-  fi
-fi
 
 
-# set os if not already set
-if [ -z "$ZETUP_OS" ]
-then
-  if [[ "$(uname -ms)" == *"Linux"* ]]
-  then export ZETUP_OS="linux"
-  else export ZETUP_OS="darwin" # we know it's either mac or linux
-  fi
-fi
+default_release="0.0.1-alpha"
+
+arch_info="$(uname -as)"
+case $arch_info in
+  *"x86_64"*) default_arch="amd64"
+  * ) default_arch="i386"
+esac
+
+os_info="$(uname -as)"
+case $os_info in
+  *"Linux"*) default_os="linux"
+  * ) default_os="darwin"
+esac
+
+ZETUP_OS=${ZETUP_OS:default_os}
+ZETUP_ARCH=${ZETUP_ARCH:default_arch}
+ZETUP_RELEASE=${ZETUP_RELEASE:default_release}
 
 
 echo "$ZETUP_RELEASE, $ZETUP_ARCH, $ZETUP_OS"
