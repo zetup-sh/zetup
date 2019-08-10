@@ -47,8 +47,7 @@ const App: React.FC = () => {
   return (
     <div>
     <div id="fog" />
-    <h1>Zup</h1>
-    <h2 className="tagline">automate your development setup</h2> */}
+    <h1>Z<span className="up">up</span></h1>
     <div className="install-menu">
     <h3>Installation</h3>
     <div className="tab top">

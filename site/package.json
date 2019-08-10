@@ -2,7 +2,7 @@
   "name": "site",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://zetup.sh",
+  "homepage": "https://zetup-sh.github.io/zetup",
   "dependencies": {
     "@types/jest": "^24.0.17",
     "@types/node": "^12.7.1",

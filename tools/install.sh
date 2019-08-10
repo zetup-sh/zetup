@@ -1,6 +1,7 @@
 #!/bin/bash
 
 echo "installing zetup..."
+echo "$ZETUP_RELEASE"
 # have to manually specify the release
 # as of now, only have prelease, and I don't
 # really feel like writing a json parser

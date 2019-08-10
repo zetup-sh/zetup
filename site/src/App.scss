@@ -15,12 +15,17 @@ code {
 h1 {
   text-align: center;
   font-size: 12em;
-  margin: 70px 0 0px 0;
+  margin: 70px auto 0px;
   text-decoration: none;
   -webkit-transition: all 0.5s;
   -moz-transition: all 0.5s;
   transition: all 0,h
   .5s;
+}
+@media (max-width: 700px) {
+  h1 .up {
+    display: none;
+  }
 }
 
 h1 {
@@ -100,7 +105,7 @@ $colorB: rgba(255, 240, 246, 0);
 
 .install-menu {
   width: 80%;
-  min-width: 400px;
+  min-width: 300px;
   max-width: 1200px;
   margin: 70px auto 0px;
 }
