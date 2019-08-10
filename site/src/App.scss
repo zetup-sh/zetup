@@ -3,6 +3,9 @@ body, button {
   background-color: black;
   font-family: "Fira Code", Arial, Helvetica, sans-serif;
 }
+body {
+    margin: 20px 0px;
+}
 
 code {
   font-family: "Fira Code", "Courier New", Courier, monospace;
@@ -15,7 +18,7 @@ code {
 h1 {
   text-align: center;
   font-size: 12em;
-  margin: 70px auto 0px;
+  margin: 30px auto 0px;
   text-decoration: none;
   -webkit-transition: all 0.5s;
   -moz-transition: all 0.5s;

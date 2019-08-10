@@ -2,23 +2,15 @@ import React, {useState, useEffect} from 'react';
 import './App.scss';
 
 
-const osMap = {
-  "Windows": "windows",
-  "Linux": "linux",
-  "Mac OS": "darwin",
-}
 
 const App: React.FC = () => {
   const [curCmd, setCurCmd] = useState()
-  const [curArch, setCurArch] = useState("amd64")
   const [curTag, setCurTag] = useState("0.0.1")
-  const [downloadEnd, setDownloadEnd] = useState("")
-  // https://github.com/zetup-sh/zetup/releases/download/0.0.1-alpha/zetup-darwin-amd64
 
   const base = "https://raw.github.com/zetup-sh/zetup/master/tools"
   const cmds = {
-    curl: `sh -c '$(curl -fsSL ${base}/install.sh)'`,
-    wget: `sh -c '$(wget ${base}/install.sh -O -)'`,
+    curl: `sh -c "$(curl -fsSL ${base}/install.sh)"`,
+    wget: `sh -c "$(wget ${base}/install.sh -O -)"`,
     powershell: `Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('${base}/install.ps1'))`,
   }
 
@@ -47,7 +39,8 @@ const App: React.FC = () => {
   return (
     <div>
     <div id="fog" />
-    <h1>Z<span className="up">up</span></h1>
+    <h1>Z</h1>
+    <h2 className="tagline">Automate Your Development Setup</h2>
     <div className="install-menu">
     <h3>Installation</h3>
     <div className="tab top">
@@ -63,16 +56,6 @@ const App: React.FC = () => {
         display: "flex",
         flex: "1",
       }} />
-      {/* <button
-        className={"tablinks"+ (curArch === "amd64" ? " active" : "")}
-        onClick={()=> setCurArch("amd64")}>
-          amd64
-      </button>
-      <button
-        className={"tablinks"+ (curArch === "i386" ? " active" : "")}
-        onClick={()=> setCurArch("i386")}>
-          i386
-      </button> */}
     </div>
     <div className="tabcontent">
       <div style={{
@@ -84,7 +67,9 @@ const App: React.FC = () => {
         overflow: "hidden",
         textOverflow: "ellipsis",
       }}>
+      {!cmds[curCmd] ? "Retrieving..." :
       <code style={{margin: "0 auto"}} id="install-cmd">{env + cmds[curCmd]}</code>
+      }
       </div>
       <div style={{
         display: "flex",
@@ -158,8 +143,4 @@ function copyTextToClipboard(text) {
   }, function(err) {
     console.error('Async: Could not copy text: ', err);
   });
-}
-function is64() {
-  return  (navigator.userAgent.indexOf("WOW64") != -1 ||
-    navigator.userAgent.indexOf("Win64") != -1 )
 }
