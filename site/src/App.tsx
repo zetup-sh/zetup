@@ -30,10 +30,9 @@ const App: React.FC = () => {
     setCurCmd(OS === "Windows" ? "powershell" : "curl")
   }, [])
 
-  const env = curTag === "" || curCmd === "powershell" ? "" : `env ZETUP_RELEASE="${curTag}" `
 
   const copyCmd = () => {
-    copyTextToClipboard(env + cmds[curCmd])
+    copyTextToClipboard(cmds[curCmd])
   }
 
   return (
@@ -68,7 +67,7 @@ const App: React.FC = () => {
         textOverflow: "ellipsis",
       }}>
       {!cmds[curCmd] ? "Retrieving..." :
-      <code style={{margin: "0 auto"}} id="install-cmd">{env + cmds[curCmd]}</code>
+      <code style={{margin: "0 auto"}} id="install-cmd">{cmds[curCmd]}</code>
       }
       </div>
       <div style={{

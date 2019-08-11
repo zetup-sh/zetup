@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-echo "installing zetup..."
+echo "Installing zetup..."
 
 
 
