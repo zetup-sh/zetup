@@ -1,11 +1,12 @@
-import React, {useState, useEffect} from 'react';
-import './App.scss';
+import React, {useState, useEffect} from 'react'
+import './App.scss'
+import './stars.sass'
+import './fog.scss'
 
 
 
 const App: React.FC = () => {
   const [curCmd, setCurCmd] = useState()
-  const [curTag, setCurTag] = useState("0.0.1")
 
   const base = "https://raw.github.com/zetup-sh/zetup/master/tools"
   const cmds = {
@@ -14,14 +15,14 @@ const App: React.FC = () => {
     powershell: `Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('${base}/install.ps1'))`,
   }
 
-  useEffect(() => {
-    ;(async () => {
-      const tagName = await fetch("https://api.github.com/repos/zetup-sh/zetup/releases")
-        .then(resp => resp.json())
-        .then(releases => releases[0].tag_name)
-      setCurTag(tagName)
-    })()
-  }, [])
+  // useEffect(() => {
+  //   ;(async () => {
+  //     const tagName = await fetch("https://api.github.com/repos/zetup-sh/zetup/releases")
+  //       .then(resp => resp.json())
+  //       .then(releases => releases[0].tag_name)
+  //     setCurTag(tagName)
+  //   })()
+  // }, [])
 
   // use effect so it doesn't add the wrong .active class to
   // installation method tab
@@ -38,6 +39,11 @@ const App: React.FC = () => {
   return (
     <div>
     <div id="fog" />
+    <div className="stars-container">
+    <div id="stars" />
+    <div id="stars2" />
+    <div id="stars3" />
+    </div>
     <h1>Z</h1>
     <h2 className="tagline">Automate Your Development Setup</h2>
     <div className="install-menu">
