@@ -9,7 +9,7 @@ if echo "$(uname -as)" | grep -q "x86_64";
 then
   default_arch="amd64"
 else
-  default_arch="i386"
+  default_arch="386"
 fi
 
 if echo "$(uname -ms)" | grep -q "Linux";
