@@ -5,8 +5,6 @@ set -e
 sudo printf ""
 echo "Installing zetup..."
 
-
-
 if echo "$(uname -as)" | grep -q "x86_64";
 then
   default_arch="amd64"
@@ -33,17 +31,14 @@ filename="zetup-$ZETUP_OS-$ZETUP_ARCH"
 url="https://github.com/zetup-sh/zetup/releases/download/$ZETUP_RELEASE/$filename.zip"
 
 tempdir="/tmp/zetup"
-echo $tempdir
 mkdir -p "$tempdir"
 templocation="/tmp/$filename.zip"
 
 curl -fsSL "$url"  -o "$templocation"
 
-
 fixed_location="/tmp/zetup-fixed.zip"
-unzip "$templocation" -d "$tempdir"  || true
+unzip -o "$templocation" -d "$tempdir" > /dev/null 2>&1  || true
 
-echo "$tempdir/$filename"
 chmod +x "$tempdir/$filename"
 sudo mv "$tempdir/$filename" "$INSTALL_LOCATION"
 
