@@ -3,3 +3,8 @@ custom
 override
 build
 vendor
+/package.json
+/node_modules
+/yarn.lock
+/package-lock.json
+/zetup*

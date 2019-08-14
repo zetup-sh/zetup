@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+# get sudo privileges early
+sudo echo
+
 echo "Installing zetup..."
 
 
@@ -27,8 +30,23 @@ ZETUP_ARCH=${ZETUP_ARCH:-$default_arch}
 ZETUP_RELEASE=${ZETUP_RELEASE:-$default_release}
 INSTALL_LOCATION=${INSTALL_LOCATION:-$default_install_location}
 
-url="https://github.com/zetup-sh/zetup/releases/download/$ZETUP_RELEASE/zetup-$ZETUP_OS-$ZETUP_ARCH"
-sudo curl -fsSL "$url"  -o "$INSTALL_LOCATION"
+filename="zetup-$ZETUP_OS-$ZETUP_ARCH"
 
-sudo chmod +x "$INSTALL_LOCATION"
-echo "Success!"
+url="https://github.com/zetup-sh/zetup/releases/download/$ZETUP_RELEASE/$filename.zip"
+
+tempdir="/tmp/zetup"
+echo $tempdir
+mkdir -p "$tempdir"
+templocation="/tmp/$filename.zip"
+
+curl -fsSL "$url"  -o "$templocation"
+
+
+fixed_location="/tmp/zetup-fixed.zip"
+unzip "$templocation" -d "$tempdir"  || true
+
+echo "$tempdir/$filename"
+chmod +x "$tempdir/$filename"
+sudo mv "$tempdir/$filename" "$INSTALL_LOCATION"
+
+echo "You have successfully installed zetup to $INSTALL_LOCATION!"
