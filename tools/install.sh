@@ -34,12 +34,18 @@ tempdir="/tmp/zetup"
 mkdir -p "$tempdir"
 templocation="/tmp/$filename.zip"
 
-curl -fsSL "$url"  -o "$templocation"
+if [ -x "$(command -v curl)"]
+then
+  curl -fsSL "$url"  -o "$templocation"
+else
+  wget "$url" -O "$templocation"
+fi
 
 fixed_location="/tmp/zetup-fixed.zip"
 unzip -o "$templocation" -d "$tempdir" > /dev/null 2>&1  || true
 
 chmod +x "$tempdir/$filename"
+mv "$tempdir/$filename" "$tempdir/zetup"
 sudo mv "$tempdir/$filename" "$INSTALL_LOCATION"
 
 echo "You have successfully installed zetup to $INSTALL_LOCATION!"
