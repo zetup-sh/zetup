@@ -1,0 +1,7 @@
+tag_name: 0.0.1-alpha
+name: "Genesis"
+draft: false
+body: |
+  This is the first release
+
+  It's mostly for testing, but should work on ubuntu, and the initialization function should work on windows as well.

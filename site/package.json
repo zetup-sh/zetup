@@ -18,7 +18,8 @@
     "react-scripts": "^3.0.1",
     "react-snapshot": "^1.3.0",
     "styled-components": "^4.3.2",
-    "typescript": "^3.5.3"
+    "typescript": "^3.5.3",
+    "yamljs": "^0.3.0"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -40,5 +41,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "node-fetch": "^2.6.0"
   }
 }

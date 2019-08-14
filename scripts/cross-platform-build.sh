@@ -28,3 +28,10 @@ do
     exit 1
   fi
 done
+
+cd ./build
+for f in ./*
+do
+  zip  "$f.zip" "$f"
+
+done
