@@ -45,7 +45,7 @@ const App: React.FC = () => {
     <div id="stars3" />
     </div>
     <h1>Z</h1>
-    <h2 className="tagline">Automate Your Development Setup</h2>
+    <h2 className="tagline">Automated Development Setups</h2>
     <div className="install-menu">
     <h3>Installation</h3>
     <div className="tab top">
