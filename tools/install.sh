@@ -34,7 +34,7 @@ tempdir="/tmp/zetup"
 mkdir -p "$tempdir"
 templocation="/tmp/$filename.zip"
 
-if [ ! -x "$(command -v curl)"]
+if [ ! -x "$(command -v curl)" ]
 then
   curl -fsSL "$url"  -o "$templocation"
 else

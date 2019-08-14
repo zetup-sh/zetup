@@ -397,7 +397,6 @@ func ensureToken() {
 			log.Fatal(err)
 		}
 	}
-	log.Println("password", password)
 
 	// send token request
 	data := TokenPayload{

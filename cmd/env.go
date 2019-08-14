@@ -22,6 +22,7 @@ var envCmd = &cobra.Command{
 			for key, setting := range mainViper.AllSettings() {
 				v, ok := setting.(string)
 				if ok {
+					envStr += "export "
 					if !strings.HasPrefix(key, "zetup-") {
 						envStr += "ZETUP_"
 					}
