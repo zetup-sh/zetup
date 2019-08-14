@@ -46,6 +46,6 @@ unzip -o "$templocation" -d "$tempdir" > /dev/null 2>&1  || true
 
 chmod +x "$tempdir/$filename"
 mv "$tempdir/$filename" "$tempdir/zetup"
-sudo mv "$tempdir/$filename" "$INSTALL_LOCATION"
+sudo mv "$tempdir/zetup" "$INSTALL_LOCATION"
 
 echo "You have successfully installed zetup to $INSTALL_LOCATION!"
