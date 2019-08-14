@@ -1,12 +1,8 @@
 #!/bin/sh
 set -e
 
-<<<<<<< HEAD
 # get sudo privileges early
-sudo echo
-
-=======
->>>>>>> b6206906a34850305e46da9c258d8702968edcd7
+sudo printf ""
 echo "Installing zetup..."
 
 
