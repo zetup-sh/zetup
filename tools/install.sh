@@ -1,9 +1,12 @@
 #!/bin/sh
 set -e
 
+<<<<<<< HEAD
 # get sudo privileges early
 sudo echo
 
+=======
+>>>>>>> b6206906a34850305e46da9c258d8702968edcd7
 echo "Installing zetup..."
 
 
@@ -29,7 +32,6 @@ ZETUP_OS=${ZETUP_OS:-$default_os}
 ZETUP_ARCH=${ZETUP_ARCH:-$default_arch}
 ZETUP_RELEASE=${ZETUP_RELEASE:-$default_release}
 INSTALL_LOCATION=${INSTALL_LOCATION:-$default_install_location}
-
 filename="zetup-$ZETUP_OS-$ZETUP_ARCH"
 
 url="https://github.com/zetup-sh/zetup/releases/download/$ZETUP_RELEASE/$filename.zip"
