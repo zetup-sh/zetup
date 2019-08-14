@@ -36,9 +36,9 @@ templocation="/tmp/$filename.zip"
 
 if [ ! -x "$(command -v curl)" ]
 then
-  wget "$url" -O "$templocation"
-else
   curl -fsSL "$url"  -o "$templocation"
+else
+  wget "$url" -O "$templocation"
 fi
 
 fixed_location="/tmp/zetup-fixed.zip"
