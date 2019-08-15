@@ -24,9 +24,6 @@ import (
 var pkgViper *viper.Viper
 var pkgToInstall string
 
-type LinuxInfo struct {
-	Distro, Arch, Release, CodeName string
-}
 type ToLink struct {
 	Src, Target string
 }
@@ -36,7 +33,15 @@ type TplInfo struct {
 	ZetupDir string
 }
 
-var linuxInfo LinuxInfo
+type OSInfo struct {
+	Type     string
+	Distro   string
+	Arch     string
+	Release  string
+	CodeName string
+}
+
+var osInfo OSInfo
 
 // initCmd represents the init command
 var useCmd = &cobra.Command{
@@ -44,6 +49,7 @@ var useCmd = &cobra.Command{
 	Short: "Specify a zetup package to use",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Unuse()
 		pkgToInstall = args[0]
 		ensureRepo()
 
@@ -60,25 +66,24 @@ var useCmd = &cobra.Command{
 		}
 
 		// install linux
-		if runtime.GOOS == "linux" {
-			linuxInfo.Distro = getSystemInfo("lsb_release", "-ds", "distro")
-			linuxInfo.Release = getSystemInfo("lsb_release", "-rs", "release")
-			linuxInfo.CodeName = getSystemInfo("lsb_release", "-cs", "release")
-			linuxInfo.Arch = getSystemInfo("uname", "-m", "architecture")
-
-			if linuxInfo.Distro == "Ubuntu" || linuxInfo.Distro == "Debian" {
-				ensureApt(pkgViper)
-				// apt installs snapd
-				ensureSnap(pkgViper)
-			}
+		if testOS("linux") {
+			osInfo.Distro = getSystemInfo("lsb_release", "-is", "release")
+			osInfo.Release = getSystemInfo("lsb_release", "-rs", "release")
+			osInfo.CodeName = getSystemInfo("lsb_release", "-cs", "release")
+			osInfo.Arch = getSystemInfo("uname", "-m", "architecture")
+			osInfo.Type = "linux"
 		}
+		getPkgInstallers(pkgViper)
+		return
+		// ensureApt(pkgViper)
+		// ensureSnap(pkgViper)
 
-		useFile, err := FindFile(usePkgDir, "use", runtime.GOOS, LINUX_EXTENSIONS, mainViper)
+		useFile, err := FindFile(usePkgDir, "use", runtime.GOOS, UNIX_EXTENSIONS, mainViper)
 		if err == nil {
 			runFile(useFile)
 		}
 
-		LinkFiles(pkgViper, "main-backup.bak")
+		linkFiles(pkgViper, "main-backup.bak")
 
 		useSubpkgs()
 
@@ -98,11 +103,11 @@ func useSubpkgs() {
 			ensureApt(subpkgViper)
 			ensureSnap(subpkgViper)
 			base := path.Base(subpkgDir)
-			useFile, err := FindFile(subpkgDir, "use", runtime.GOOS, LINUX_EXTENSIONS, subpkgViper)
+			useFile, err := FindFile(subpkgDir, "use", runtime.GOOS, UNIX_EXTENSIONS, subpkgViper)
 			if err == nil {
 				runFile(useFile)
 			}
-			LinkFiles(subpkgViper, base+".sub.bak")
+			linkFiles(subpkgViper, base+".sub.bak")
 		}
 
 	}
@@ -121,7 +126,7 @@ func getListOfSubpkgs() []string {
 	return subpkgDirs
 }
 
-func LinkFiles(curViper *viper.Viper, bakupName string) {
+func linkFiles(curViper *viper.Viper, bakupName string) {
 	// link files
 	linkFirst, ok := curViper.Get("link").([]interface{})
 	if !ok {
@@ -144,7 +149,8 @@ func LinkFiles(curViper *viper.Viper, bakupName string) {
 		if src == "" || target == "" {
 			log.Fatal("all links must include a target and a src", toLink)
 		}
-		if linkOS == runtime.GOOS || linkOS == "" {
+
+		if testOS(linkOS) {
 			targetTmpl, err := template.New("target").Parse(target)
 			if err != nil {
 				log.Println("There was a problem with ", target)
@@ -232,7 +238,30 @@ func init() {
 var usePkgDir string
 var usePkgDirParent string
 
+type pkgInstallerConfig struct {
+	Cmd        string
+	OSInfo     OSInfo
+	InstallCmd string
+	Pkgs       []string
+}
+
+func getPkgInstallers(vip *viper.Viper) {
+	test := vip.GetString("test")
+	log.Println(test)
+	pkgInstallers := vip.Get("pkg-installers")
+	log.Println(pkgInstallers)
+}
+
+var pkgInstallers []pkgInstallerConfig
+
+func ensurePkgInstaller(vip *viper.Viper, cfg pkgInstallerConfig) {
+
+}
+
 func ensureSnap(vip *viper.Viper) {
+	if !commandExists("snap") {
+		return
+	}
 	// check if there are any apt packages not already installed
 	snapPackages := vip.GetStringSlice("snap")
 	if len(snapPackages) == 0 {
@@ -265,7 +294,10 @@ func ensureSnap(vip *viper.Viper) {
 }
 
 func ensureApt(vip *viper.Viper) {
-	// check if there are any apt packages not already installed
+	if !commandExists("apt-get") {
+		return
+	}
+	// check if there are any apt packaLINUX_EXTENSIONSges not already installed
 	aptPackages := vip.GetStringSlice("apt")
 
 	aptPackagesAlreadyInstalled := mainViper.GetStringMap("installed-apt")
@@ -364,4 +396,15 @@ func ensureRepo() {
 			log.Fatal(err)
 		}
 	}
+}
+
+func commandExists(cmd string) bool {
+	_, err := exec.LookPath(cmd)
+	return err == nil
+}
+
+func testOS(testos string) bool {
+	testos = strings.ToLower(testos)
+	curos := runtime.GOOS
+	return curos == testos || (testos == "unix" && (curos == "linux" || curos == "darwin"))
 }

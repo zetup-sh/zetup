@@ -43,7 +43,7 @@ func Execute() {
 	}
 }
 
-var LINUX_EXTENSIONS []string
+var UNIX_EXTENSIONS []string
 var mainViper *viper.Viper
 
 var cfgFile string
@@ -64,7 +64,7 @@ var rcDir string
 
 func init() {
 	mainViper = viper.New()
-	LINUX_EXTENSIONS = []string{"", ".sh", ".bash", ".zsh"}
+	UNIX_EXTENSIONS = []string{"", ".sh", ".bash", ".zsh"}
 	// make sure user is not root on linux
 	if runtime.GOOS == "linux" {
 		cmd := exec.Command("id", "-u")

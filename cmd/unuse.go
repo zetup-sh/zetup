@@ -26,7 +26,7 @@ func init() {
 
 func Unuse() {
 	RestoreBackupFiles()
-	unuseFile, err := FindFile(usePkgDir, "unuse", runtime.GOOS, LINUX_EXTENSIONS, mainViper)
+	unuseFile, err := FindFile(usePkgDir, "unuse", runtime.GOOS, UNIX_EXTENSIONS, mainViper)
 	if err == nil {
 		runFile(unuseFile)
 	}
