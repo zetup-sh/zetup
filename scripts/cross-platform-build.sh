@@ -33,5 +33,4 @@ cd ./build
 for f in ./*
 do
   zip  "$f.zip" "$f"
-
 done

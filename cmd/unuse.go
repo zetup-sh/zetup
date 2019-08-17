@@ -3,7 +3,6 @@ package cmd
 import (
 	"io/ioutil"
 	"os"
-	"path"
 	"runtime"
 
 	"github.com/spf13/cobra"
@@ -16,7 +15,7 @@ var unuseCmd = &cobra.Command{
 	Short: "undo all undoable changes made by a program",
 	Long:  `This will run the unuse command in the zetup package as well as restore backups to any linked files like bashrc or tmux.conf`,
 	Run: func(cmd *cobra.Command, args []string) {
-		Unuse()
+		unuse()
 	},
 }
 
@@ -24,32 +23,25 @@ func init() {
 	rootCmd.AddCommand(unuseCmd)
 }
 
-func Unuse() {
-	RestoreBackupFiles()
-	unuseFile, err := FindFile(usePkgDir, "unuse", runtime.GOOS, LINUX_EXTENSIONS, mainViper)
+func unuse() {
+	restoreLinkFiles()
+	unuseFile, err := FindFile(usePkgDir, "unuse", runtime.GOOS, unixExtensions, mainViper)
 	if err == nil {
 		runFile(unuseFile)
 	}
+	mainViper.Set("use-pkg", "")
+	mainViper.WriteConfig()
 }
 
-func RestoreBackupFiles() {
-	files, err := ioutil.ReadDir(bakDir)
+func restoreLinkFiles() {
+	dat, err := ioutil.ReadFile(linkBackupFile)
 	check(err)
-	var bakupFiles []string
-	for _, file := range files {
-		bakupFiles = append(bakupFiles, path.Join(bakDir, file.Name()))
-	}
 
-	for _, bakupFile := range bakupFiles {
-		// restore backups of linked files
-		dat, err := ioutil.ReadFile(bakupFile)
+	var backedupFiles []BackupFileInfo
+	yaml.Unmarshal(dat, &backedupFiles)
+	for _, backedupFile := range backedupFiles {
+		err = os.Remove(backedupFile.Location)
 		check(err)
-		var backedupFiles []BackupFileInfo
-		yaml.Unmarshal(dat, &backedupFiles)
-		for _, backedupFile := range backedupFiles {
-			err = os.Remove(backedupFile.Location)
-			check(err)
-			ioutil.WriteFile(backedupFile.Location, []byte(backedupFile.Contents), 0644)
-		}
+		ioutil.WriteFile(backedupFile.Location, []byte(backedupFile.Contents), 0644)
 	}
 }

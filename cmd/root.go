@@ -43,7 +43,7 @@ func Execute() {
 	}
 }
 
-var LINUX_EXTENSIONS []string
+var unixExtensions = []string{"", ".sh", ".bash", ".zsh"}
 var mainViper *viper.Viper
 
 var cfgFile string
@@ -59,14 +59,14 @@ var publicKeyFile string
 var githubToken string
 var pkgDir string
 var verbose bool
-
-var rcDir string
+var linkBackupFile string
+var idFile string
 
 func init() {
 	mainViper = viper.New()
-	LINUX_EXTENSIONS = []string{"", ".sh", ".bash", ".zsh"}
-	// make sure user is not root on linux
-	if runtime.GOOS == "linux" {
+
+	// make sure user is not root on unix
+	if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
 		cmd := exec.Command("id", "-u")
 		output, err := cmd.Output()
 
@@ -79,7 +79,7 @@ func init() {
 			log.Fatal(err)
 		}
 		if i == 0 {
-			log.Fatal("Please don't run zetup as root. zetup is meant for user accounts. If you really need to run as root, please open an issue, but it will probably mess up the permissions systems if you do.")
+			log.Fatal("Please don't run zetup as root. zetup is meant for user accounts. Zetup will request root permissions when it needs them.")
 		}
 	}
 	log.SetFlags(log.Lshortfile)
@@ -115,15 +115,12 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&name, "user.name", "", "", "your name")
 	rootCmd.PersistentFlags().StringVarP(&email, "user.email", "", "", "your email")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
+	idCmd.PersistentFlags().StringVarP(&idFile, "id-file", "", "", "file to store identities")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
-}
-
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
 	home, err := homedir.Dir()
 	if err != nil {
 		log.Fatal(err)
@@ -150,6 +147,11 @@ func initConfig() {
 			log.Fatal(err)
 		}
 	}
+}
+
+// initConfig reads in config file and ENV variables if set.
+func initConfig() {
+	home, err := homedir.Dir()
 
 	mainViper.Set("verbose", verbose)
 	pkgDir = mainViper.GetString("pkg-dir")
@@ -201,11 +203,10 @@ func initConfig() {
 		mainViper.Set("private-key-file", privateKeyFile)
 	}
 
-	rcDir = path.Join(zetupDir, "rc")
-	_ = os.Mkdir(rcDir, 0755)
-
 	bakDir = path.Join(zetupDir, ".bak")
 	_ = os.Mkdir(bakDir, 0755)
+
+	linkBackupFile = path.Join(zetupDir, ".link-backup")
 
 	ensureToken()
 	getUserInfo()

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"runtime"
 
 	"github.com/spf13/viper"
 )
@@ -82,4 +83,13 @@ func runFile(cmdFilePath string) {
 	if err != nil {
 		log.Fatalf("%s %s\n", cmdFilePath, err)
 	}
+}
+
+func commandExists(cmd string) bool {
+	_, err := exec.LookPath(cmd)
+	return err == nil
+}
+
+func isUnix() bool {
+	return runtime.GOOS == "linux" || runtime.GOOS == "darwin"
 }
