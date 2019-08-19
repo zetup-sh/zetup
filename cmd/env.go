@@ -43,39 +43,6 @@ var envCmd = &cobra.Command{
 				}
 				envStr += strings.ToUpper(strings.ReplaceAll(key, "-", "_")) + "=" + v + "\n"
 			}
-
-			// I hate go
-			// if key == "identities" {
-			// 	idErrMessage := "Sorry, there was a problem with an identity"
-			// 	idArray, ok := setting.(map[string]interface{})
-			// 	if ok {
-			// 		for idType, ids := range idArray {
-			// 			idGroupArray, ok := ids.([]interface{})
-			// 			if ok {
-			// 				for _, idGroup := range idGroupArray {
-			// 					id, ok := idGroup.(map[interface{}]interface{})
-			// 					if ok {
-			// 						log.Println("type:", idType)
-			// 						for key, val := range id {
-			// 							log.Printf("%v: %v", key, val)
-			// 						}
-			// 					} else {
-			// 						log.Fatal(idErrMessage)
-			// 					}
-			// 				}
-			// 			} else {
-			// 				log.Fatal(idErrMessage)
-			// 			}
-			// 		}
-			// 	} else {
-			// 		log.Fatal(idErrMessage)
-			// 	}
-			// }
-			// n, ok := setting.([]interface{})
-			// if ok {
-			// 	fmt.Println("[]interface")
-			// 	log.Printf("n", n)
-			// }
 		}
 		envStr += "# add eval `zetup env` to your .bashrc\n"
 		fmt.Fprintf(os.Stdout, envStr)

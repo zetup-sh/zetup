@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -60,13 +61,15 @@ var githubToken string
 var pkgDir string
 var verbose bool
 var linkBackupFile string
-var idFile string
+var forceAllowRoot bool
 
 func init() {
 	mainViper = viper.New()
 
 	// make sure user is not root on unix
 	if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
+		rootCmd.PersistentFlags().BoolVarP(&forceAllowRoot, "force-allow-root", "", false,
+			"allow zetup to be run as root (could cause problems)")
 		cmd := exec.Command("id", "-u")
 		output, err := cmd.Output()
 
@@ -78,8 +81,8 @@ func init() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if i == 0 {
-			log.Fatal("Please don't run zetup as root. zetup is meant for user accounts. Zetup will request root permissions when it needs them.")
+		if i == 0 && !forceAllowRoot {
+			log.Fatal("Please don't run zetup as root. zetup is meant for user accounts. Zetup will request root permissions when it needs them. You can override this with --force-allow-root")
 		}
 	}
 	log.SetFlags(log.Lshortfile)
@@ -110,16 +113,13 @@ func init() {
 		"github personal access token")
 	rootCmd.PersistentFlags().StringVarP(&publicKeyFile, "public-key-file", "", "",
 		"ssh public key file")
-	rootCmd.PersistentFlags().StringVarP(&privateKeyFile, "private-key-file", "",
+	rootCmd.PersistentFlags().StringVarP(
+		&privateKeyFile, "private-key-file", "",
 		"", "ssh private key file")
 	rootCmd.PersistentFlags().StringVarP(&name, "user.name", "", "", "your name")
 	rootCmd.PersistentFlags().StringVarP(&email, "user.email", "", "", "your email")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
-	idCmd.PersistentFlags().StringVarP(&idFile, "id-file", "", "", "file to store identities")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.PersistentFlags().StringVarP(&idFile, "id-file", "", "", "file to store identities")
 
 	home, err := homedir.Dir()
 	if err != nil {
@@ -146,6 +146,11 @@ func init() {
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		idFile = filepath.Join(zetupDir, "identities.yml")
+		// if !util.Exists("identities.yml") {
+
+		// }
 	}
 }
 
