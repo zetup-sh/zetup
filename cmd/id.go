@@ -30,8 +30,8 @@ var idAddCmd = &cobra.Command{
 	Short: "add identities",
 	Long:  getIDAddLngUsage(),
 	Run: func(cmd *cobra.Command, args []string) {
-		idLists := getCurrentIdentityLists()
 		getIDParts(args)
+		log.Println("You entered ", idType, idUsername, idPassword)
 	},
 }
 
@@ -61,13 +61,17 @@ func getIDParts(args []string) {
 		log.Fatalln(getIDAddLngUsage())
 	}
 	if idType == "" {
-		idType = getValidIDLngName(readInput("Please enter id type (github, gitlab, digitalocean, etc.): "))
+		userInput := readInput("Please enter id type (github, gitlab, digitalocean, etc.): ")
+		idType = getValidIDLngName(userInput)
 	}
 	if idUsername == "" {
 		idUsername = readInput(idType + " username: ")
 	}
 	if idToken == "" && idPassword == "" {
-		userInput := readInput(idType + " token (autodetected): ")
+		if idType == "github" {
+			fmt.Println("Note: A token will automatically be generated using your pasword for github accounts.")
+		}
+		userInput := readInput(idType + " password or token: ")
 		getTokenOrPassword(userInput)
 	}
 }
@@ -92,8 +96,7 @@ func readInput(prompt string) string {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf(prompt)
 	enteredData, err := reader.ReadString('\n')
-	trimmedData := strings.TrimRight(enteredData, "\n")
-	trimmedData = strings.Trim(enteredData, " ")
+	trimmedData := strings.TrimSpace(enteredData)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -122,7 +125,7 @@ func getValidIDLngName(idType string) string {
 			return name
 		}
 	}
-	log.Fatalln(getIDAddLngUsage)
+	log.Fatalln(getIDAddLngUsage())
 	return ""
 }
 
