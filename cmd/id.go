@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
 	"github.com/zetup-sh/zetup/cmd/util"
 	"gopkg.in/yaml.v2"
@@ -37,28 +38,31 @@ var idAddCmd = &cobra.Command{
 
 func getIDParts(args []string) {
 	if len(args) == 1 {
-		nextStr := args[0]
+		nextStr := ""
 		if strings.Contains(args[0], "/") {
-			passedVals := strings.Split(args[0], "/")
-			idType = getValidIDLngName(passedVals[0])
-			nextStr = passedVals[1]
-		}
-		if idType == "" {
-			log.Fatalln("You must provide an id type (github/gitlab/etc.) if you are going to provide a username and password. See usage for more info.")
+			splitVals := strings.Split(args[0], "/")
+			idType = getValidIDLngName(splitVals[0])
+			nextStr = splitVals[1]
+		} else {
+			idType = getValidIDLngName(args[0])
 		}
 
-		if strings.Contains(nextStr, ":") {
-			passedVals := strings.Split(args[0], ":")
-			idUsername = passedVals[0]
-			getTokenOrPassword(passedVals[1])
+		if nextStr != "" {
+			if strings.Contains(nextStr, ":") {
+				splitVals := strings.Split(nextStr, ":")
+				idUsername = splitVals[0]
+				getTokenOrPassword(splitVals[1])
+			} else {
+				idUsername = nextStr
+			}
 		}
+	} else if len(args) == 2 {
+		idType = args[0]
+		idUsername = args[1]
 	} else if len(args) == 3 {
 		idType = args[0]
 		idUsername = args[1]
 		getTokenOrPassword(args[2])
-	}
-	if len(args) > 0 {
-		log.Fatalln(getIDAddLngUsage())
 	}
 	if idType == "" {
 		userInput := readInput("Please enter id type (github, gitlab, digitalocean, etc.): ")
@@ -71,7 +75,8 @@ func getIDParts(args []string) {
 		if idType == "github" {
 			fmt.Println("Note: A token will automatically be generated using your pasword for github accounts.")
 		}
-		userInput := readInput(idType + " password or token: ")
+		userInput, err := speakeasy.Ask(idType + " password or token: ")
+		check(err)
 		getTokenOrPassword(userInput)
 	}
 }
@@ -120,9 +125,14 @@ func checkIsGitlabToken(txt string) bool {
 }
 
 func getValidIDLngName(idType string) string {
-	for name, alias := range possibleIDTypes {
-		if idType == name || idType == alias {
+	for name, aliases := range possibleIDTypes {
+		if name == idType {
 			return name
+		}
+		for _, alias := range aliases {
+			if idType == alias {
+				return name
+			}
 		}
 	}
 	log.Fatalln(getIDAddLngUsage())
@@ -140,16 +150,19 @@ You can also just type "zetup id add" and follow the prompts.
 You can also use aliases the id types. The aliases are as follows:
 `
 	aliasUsage := ""
-	for name, alias := range possibleIDTypes {
-		aliasUsage += name + ": " + alias + "\n"
+	for name, aliases := range possibleIDTypes {
+		aliasUsage += name + ": "
+		for _, alias := range aliases {
+			aliasUsage += "  " + alias + "\n"
+		}
 	}
 	return idAddLngUsage + aliasUsage
 }
 
-var possibleIDTypes = map[string]string{
-	"github":       "gh",
-	"gitlab":       "gl",
-	"digitalocean": "do",
+var possibleIDTypes = map[string][]string{
+	"github":       []string{"github.com", "gh"},
+	"gitlab":       []string{"gitlab.com", "gl"},
+	"digitalocean": []string{"do"},
 }
 
 var idType string
