@@ -34,27 +34,53 @@ var idAddCmd = &cobra.Command{
 	Long:  getIDAddLngUsage(),
 	Run: func(cmd *cobra.Command, args []string) {
 		var idsInfo []tIDInfo
+		curIDLists := getCurrentIdentityLists()
 		if len(args) == 0 {
 			idsInfo = append(idsInfo, getEmptyID())
 		} else {
 			idsInfo = parseAddIDArgs(args)
 		}
-		for _, idInfo := range idsInfo {
-			if idInfo.Type == "github" && idInfo.Token == "" {
-				tokenData := ensureGithubToken(idInfo)
-				idInfo.Password = ""
-				idInfo.Token = tokenData.Token
-			}
-			log.Println(idInfo)
+		var finalIDLists tIDLists
+		finalIDLists.List = make(map[string][]tIDInfo)
+		possibleIDTypes := []string{"github", "gitlab", "digitalocean"}
+		for _, idType := range possibleIDTypes {
+			finalIDLists.List[idType] = curIDLists.List[idType]
 		}
 
-		// idLists := getCurrentIdentityLists()
+		for _, idInfo := range idsInfo {
+			if idListContains(finalIDLists, idInfo) && !idAddOverwrite {
+				continue
+			}
+			if idInfo.Type == "github" {
+				if !checkIsGithubToken(idInfo.Password) && idAddGHToken {
+					tokenData := ensureGithubToken(idInfo)
+					idInfo.Password = tokenData.Token
+				}
+			}
+			finalIDLists.List[idInfo.Type] = append(finalIDLists.List[idInfo.Type], idInfo)
+		}
 
-		// // write token to file
-		// mainViper.Set("github-token", respTokenData.Token)
-		// mainViper.Set("github-token-id", respTokenData.Id)
-		// mainViper.Set("github-username", githubUsername)
+		marshaled, err := yaml.Marshal(finalIDLists)
+		check(err)
+
+		idInfoWithHeader := []byte("# generated file do not edit\n" + string(marshaled))
+		err = ioutil.WriteFile(idFile, idInfoWithHeader, 0644)
+		check(err)
 	},
+}
+
+func idListContains(list tIDLists, idInfo tIDInfo) bool {
+	for _, testIDInfo := range list.List[idInfo.Type] {
+		if testIDInfo.Username == idInfo.Username {
+			return true
+		}
+	}
+	return false
+}
+
+type idCredentials struct {
+	Gitlab tIDInfo
+	Github tIDInfo
 }
 
 // addPublicKeyToGithub(string(publicKeyBytes), mainViper.GetString("github-token"))
@@ -84,7 +110,7 @@ func getIDParts(acctInfo tIDInfo) tIDInfo {
 	if acctInfo.Username == "" {
 		acctInfo.Username = readInput(titleType + " username: ")
 	}
-	if acctInfo.Token == "" && acctInfo.Password == "" {
+	if acctInfo.Password == "" {
 		if acctInfo.Type == "github" {
 			fmt.Println("Note: A token will automatically be generated using your pasword for github accounts.")
 		} else if acctInfo.Type == "gitlab" {
@@ -93,17 +119,15 @@ func getIDParts(acctInfo tIDInfo) tIDInfo {
 		userInput, err := speakeasy.Ask(titleType + " " +
 			acctInfo.Username + " password or token: ")
 		check(err)
-		acctInfo = getTokenOrPassword(userInput, acctInfo)
+		acctInfo.Password = userInput
 	}
 	return acctInfo
 }
 
 type tIDInfo struct {
-	Type     string
-	Username string
-	Password string
-	Token    string
-	TokenID  string
+	Type     string `yaml:"type"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
 }
 
 func parseIDString(idStr string) tIDInfo {
@@ -121,26 +145,9 @@ func parseIDString(idStr string) tIDInfo {
 		if strings.Contains(nextStr, ":") {
 			splitVals := strings.Split(nextStr, ":")
 			acctInfo.Username = splitVals[0]
-			acctInfo = getTokenOrPassword(splitVals[1], acctInfo)
+			acctInfo.Password = splitVals[1]
 		} else {
 			acctInfo.Username = nextStr
-		}
-	}
-	return acctInfo
-}
-
-func getTokenOrPassword(arg string, acctInfo tIDInfo) tIDInfo {
-	if acctInfo.Type == "github" {
-		if checkIsGithubToken(arg) {
-			acctInfo.Token = arg
-		} else {
-			acctInfo.Password = arg
-		}
-	} else if acctInfo.Type == "gitlab" {
-		if checkIsGitlabToken(arg) {
-			acctInfo.Token = arg
-		} else {
-			acctInfo.Password = arg
 		}
 	}
 	return acctInfo
@@ -155,7 +162,7 @@ func checkIsGithubToken(txt string) bool {
 }
 
 func checkIsGitlabToken(txt string) bool {
-	isgltoken, err := regexp.MatchString("^[A-Za-z0-9]{40}$", txt)
+	isgltoken, err := regexp.MatchString("^[A-Za-z0-9]{20}$", txt)
 	if err != nil {
 		log.Fatal("There was a problem checking if you provided a gitlab token or not.")
 	}
@@ -191,7 +198,7 @@ You can also use aliases the id types. The aliases are as follows:
 `
 	aliasUsage := ""
 	for name, aliases := range possibleIDTypes {
-		aliasUsage += name + ": "
+		aliasUsage += name + ":\n"
 		for _, alias := range aliases {
 			aliasUsage += "  " + alias + "\n"
 		}
@@ -202,23 +209,25 @@ You can also use aliases the id types. The aliases are as follows:
 var possibleIDTypes = map[string][]string{
 	"github":       []string{"github.com", "gh"},
 	"gitlab":       []string{"gitlab.com", "gl"},
-	"digitalocean": []string{"do"},
+	"digitalocean": []string{"digitalocean.com", "do"},
 }
 
 var idFile string
-var idAddDontAddSSH bool
+var idAddAddSSH bool
+var idAddOverwrite bool
+var idAddGHToken bool
 
 func init() {
 	idFile = filepath.Join(zetupDir, "identities.yml")
 	rootCmd.AddCommand(idCmd)
 	idCmd.AddCommand(idAddCmd)
-	idAddCmd.Flags().BoolVarP(&idAddDontAddSSH, "no-ssh", "", false, "don't add ssh key to account")
+	idAddCmd.Flags().BoolVarP(&idAddAddSSH, "ssh", "", true, "add ssh key to account")
+	idAddCmd.Flags().BoolVarP(&idAddOverwrite, "overwrite", "", false, "overwrite existing accounts with the same username")
+	idAddCmd.Flags().BoolVarP(&idAddGHToken, "gh-token", "", true, "create token for github instead of using plain text password")
 }
 
 type tIDLists struct {
-	Github       []map[string]string `yaml:"github"`
-	Gitlab       []map[string]string `yaml:"gitlab"`
-	DigitalOcean []map[string]string `yaml:"digitalocean"`
+	List map[string][]tIDInfo
 }
 
 func getCurrentIdentityLists() tIDLists {
