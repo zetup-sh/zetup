@@ -22,7 +22,6 @@ import (
 	"github.com/bgentry/speakeasy"
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/spf13/cobra"
-	"github.com/zetup-sh/zetup/cmd/util"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
@@ -220,53 +219,6 @@ func initConfig() {
 	mainViper.WriteConfig()
 }
 
-func ensureSSHKey() {
-	publicKeyFile := mainViper.GetString("public-key-file")
-	privateKeyFile := mainViper.GetString("private-key-file")
-	if mainViper.GetString("ssh-key-id") != "" {
-		if _, err := os.Stat(publicKeyFile); !os.IsNotExist(err) {
-			if _, err := os.Stat(privateKeyFile); !os.IsNotExist(err) {
-				return
-			}
-		}
-	}
-	if mainViper.GetBool("verbose") {
-		log.Println("creating ssh key pair...")
-	}
-
-	bitSize := 4096
-
-	privateKey, err := util.GeneratePrivateKey(bitSize)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	publicKeyBytes, err := util.GeneratePublicKey(&privateKey.PublicKey)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	privateKeyBytes := util.EncodePrivateKeyToPEM(privateKey)
-
-	err = util.WriteKeyToFile(privateKeyBytes, privateKeyFile)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	err = util.WriteKeyToFile([]byte(publicKeyBytes), publicKeyFile)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	addPublicKeyToGithub(string(publicKeyBytes), mainViper.GetString("github-token"))
-	if mainViper.GetBool("verbose") {
-		log.Println("ssh key pair created.")
-	}
-}
-
-type SSHKeyInfo struct {
-	Id int `json:"id"`
-}
-
 func addPublicKeyToGithub(pubKey string, githubToken string) {
 	body := strings.NewReader(fmt.Sprintf(`{
 				"title": "%v",
@@ -293,12 +245,12 @@ func addPublicKeyToGithub(pubKey string, githubToken string) {
 	defer resp.Body.Close()
 
 	decoder := json.NewDecoder(resp.Body)
-	var sshKeyInfo SSHKeyInfo
+	var sshKeyInfo sshKeyInfo
 	err = decoder.Decode(&sshKeyInfo)
 	if err != nil {
 		log.Fatal(err)
 	}
-	mainViper.Set("ssh-key-id", sshKeyInfo.Id)
+	mainViper.Set("ssh-key-id", sshKeyInfo.ID)
 }
 
 func check(err error) {

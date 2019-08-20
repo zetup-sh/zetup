@@ -1,13 +1,15 @@
 package cmd
 
 import (
-	"bufio"
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
+	"net/http"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/bgentry/speakeasy"
@@ -31,81 +33,117 @@ var idAddCmd = &cobra.Command{
 	Short: "add identities",
 	Long:  getIDAddLngUsage(),
 	Run: func(cmd *cobra.Command, args []string) {
-		getIDParts(args)
-		log.Println("You entered ", idType, idUsername, idPassword)
+		var idsInfo []tIDInfo
+		if len(args) == 0 {
+			idsInfo = append(idsInfo, getEmptyID())
+		} else {
+			idsInfo = parseAddIDArgs(args)
+		}
+		for _, idInfo := range idsInfo {
+			if idInfo.Type == "github" && idInfo.Token == "" {
+				tokenData := ensureGithubToken(idInfo)
+				idInfo.Password = ""
+				idInfo.Token = tokenData.Token
+			}
+			log.Println(idInfo)
+		}
+
+		// idLists := getCurrentIdentityLists()
+
+		// // write token to file
+		// mainViper.Set("github-token", respTokenData.Token)
+		// mainViper.Set("github-token-id", respTokenData.Id)
+		// mainViper.Set("github-username", githubUsername)
 	},
 }
 
-func getIDParts(args []string) {
-	if len(args) == 1 {
-		nextStr := ""
-		if strings.Contains(args[0], "/") {
-			splitVals := strings.Split(args[0], "/")
-			idType = getValidIDLngName(splitVals[0])
-			nextStr = splitVals[1]
-		} else {
-			idType = getValidIDLngName(args[0])
-		}
+// addPublicKeyToGithub(string(publicKeyBytes), mainViper.GetString("github-token"))
+// if mainViper.GetBool("verbose") {
+// 	log.Println("ssh key pair created.")
+// }
 
-		if nextStr != "" {
-			if strings.Contains(nextStr, ":") {
-				splitVals := strings.Split(nextStr, ":")
-				idUsername = splitVals[0]
-				getTokenOrPassword(splitVals[1])
-			} else {
-				idUsername = nextStr
-			}
-		}
-	} else if len(args) == 2 {
-		idType = args[0]
-		idUsername = args[1]
-	} else if len(args) == 3 {
-		idType = args[0]
-		idUsername = args[1]
-		getTokenOrPassword(args[2])
+func getEmptyID() tIDInfo {
+	var acctInfo tIDInfo
+	return getIDParts(acctInfo)
+}
+
+func parseAddIDArgs(args []string) (idsInfo []tIDInfo) {
+	for _, arg := range args {
+		curAcctInfo := parseIDString(arg)
+		idsInfo = append(idsInfo, getIDParts(curAcctInfo))
 	}
-	if idType == "" {
+	return idsInfo
+}
+
+func getIDParts(acctInfo tIDInfo) tIDInfo {
+	if acctInfo.Type == "" {
 		userInput := readInput("Please enter id type (github, gitlab, digitalocean, etc.): ")
-		idType = getValidIDLngName(userInput)
+		acctInfo.Type = getValidIDLngName(strings.ToLower(userInput))
 	}
-	if idUsername == "" {
-		idUsername = readInput(idType + " username: ")
+	titleType := strings.Title(acctInfo.Type)
+	if acctInfo.Username == "" {
+		acctInfo.Username = readInput(titleType + " username: ")
 	}
-	if idToken == "" && idPassword == "" {
-		if idType == "github" {
+	if acctInfo.Token == "" && acctInfo.Password == "" {
+		if acctInfo.Type == "github" {
 			fmt.Println("Note: A token will automatically be generated using your pasword for github accounts.")
+		} else if acctInfo.Type == "gitlab" {
+			fmt.Println("Note: gitlab passwords will be stored as plain text.\nYou can generate a token here: https://gitlab.com/profile/personal_access_tokens")
 		}
-		userInput, err := speakeasy.Ask(idType + " password or token: ")
+		userInput, err := speakeasy.Ask(titleType + " " +
+			acctInfo.Username + " password or token: ")
 		check(err)
-		getTokenOrPassword(userInput)
+		acctInfo = getTokenOrPassword(userInput, acctInfo)
 	}
+	return acctInfo
 }
 
-func getTokenOrPassword(arg string) {
-	if idType == "github" {
+type tIDInfo struct {
+	Type     string
+	Username string
+	Password string
+	Token    string
+	TokenID  string
+}
+
+func parseIDString(idStr string) tIDInfo {
+	var acctInfo tIDInfo
+	nextStr := ""
+	if strings.Contains(idStr, "/") {
+		splitVals := strings.Split(idStr, "/")
+		acctInfo.Type = getValidIDLngName(splitVals[0])
+		nextStr = splitVals[1]
+	} else {
+		acctInfo.Type = getValidIDLngName(idStr)
+	}
+
+	if nextStr != "" {
+		if strings.Contains(nextStr, ":") {
+			splitVals := strings.Split(nextStr, ":")
+			acctInfo.Username = splitVals[0]
+			acctInfo = getTokenOrPassword(splitVals[1], acctInfo)
+		} else {
+			acctInfo.Username = nextStr
+		}
+	}
+	return acctInfo
+}
+
+func getTokenOrPassword(arg string, acctInfo tIDInfo) tIDInfo {
+	if acctInfo.Type == "github" {
 		if checkIsGithubToken(arg) {
-			idToken = arg
+			acctInfo.Token = arg
 		} else {
-			idPassword = arg
+			acctInfo.Password = arg
 		}
-	} else if idType == "gitlab" {
+	} else if acctInfo.Type == "gitlab" {
 		if checkIsGitlabToken(arg) {
-			idToken = arg
+			acctInfo.Token = arg
 		} else {
-			idPassword = arg
+			acctInfo.Password = arg
 		}
 	}
-}
-
-func readInput(prompt string) string {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf(prompt)
-	enteredData, err := reader.ReadString('\n')
-	trimmedData := strings.TrimSpace(enteredData)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return trimmedData
+	return acctInfo
 }
 
 func checkIsGithubToken(txt string) bool {
@@ -141,9 +179,11 @@ func getValidIDLngName(idType string) string {
 
 func getIDAddLngUsage() string {
 	idAddLngUsage := `
-You can add the identity of an account (github, gitlab, etc.) with the command  "zetup id add [user information]".
+You can add the identity of an account (github, gitlab, etc.) with the command  "zetup id add [USER_INFORMATION]".
 
-You can pass the user information to the command with the flags, or you can pass it in the form of an argument like "zetup id add github.com/username:{token or password}" or just "zetup id add github.com username {token or password}"
+Where user information is in the form "[ID_TYPE]/[USERNAME]:[PASSWORD]", for instance "github/sam_clem:nJim&9024". You can pass multiple accounts at once, like "zetup id add [USER_INFORMATION] [USER_INFORMATION]....
+
+You can omit any part starting from the right. You couldn't say, provide a password and not a username, but you could provide a username and no password.
 
 You can also just type "zetup id add" and follow the prompts.
 
@@ -165,20 +205,14 @@ var possibleIDTypes = map[string][]string{
 	"digitalocean": []string{"do"},
 }
 
-var idType string
-var idUsername string
-var idPassword string
-var idToken string
 var idFile string
+var idAddDontAddSSH bool
 
 func init() {
 	idFile = filepath.Join(zetupDir, "identities.yml")
 	rootCmd.AddCommand(idCmd)
-	idCmd.PersistentFlags().StringVarP(&idUsername, "username", "u", "", "username for github")
-	idCmd.PersistentFlags().StringVarP(&idPassword, "password", "p", "", "password for github")
-	idCmd.PersistentFlags().StringVarP(&idToken, "token", "", "", "token for provider (will create if possible)")
-	idCmd.PersistentFlags().StringVarP(&idType, "type", "t", "", "token for provider (will create if possible)")
 	idCmd.AddCommand(idAddCmd)
+	idAddCmd.Flags().BoolVarP(&idAddDontAddSSH, "no-ssh", "", false, "don't add ssh key to account")
 }
 
 type tIDLists struct {
@@ -196,4 +230,77 @@ func getCurrentIdentityLists() tIDLists {
 		return IDLists
 	}
 	return IDLists
+}
+
+type tTokenFailureData struct {
+	Errors []map[string]string `json:"errors"`
+}
+
+var overrideIDGHTokenNumber = 0
+
+func ensureGithubToken(acctInfo tIDInfo) TokenInfo {
+	installID := mainViper.GetString("installation-id")
+	if overrideIDGHTokenNumber != 0 {
+		installID += "-" + strconv.Itoa(overrideIDGHTokenNumber)
+	}
+	// send token request
+	data := TokenPayload{
+		Note: installID,
+		Scopes: []string{
+			"repo",
+			"admin:org",
+			"admin:public_key",
+			"admin:repo_hook",
+			"gist",
+			"notifications",
+			"user",
+			"delete_repo",
+			"write:discussion",
+			"admin:gpg_key",
+		},
+	}
+	payloadBytes, err := json.Marshal(data)
+	if err != nil {
+		log.Fatal(err)
+	}
+	body := bytes.NewReader(payloadBytes)
+
+	req, err := http.NewRequest("POST", "https://api.github.com/authorizations", body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req.SetBasicAuth(acctInfo.Username, acctInfo.Password)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
+		var errorsObj tTokenFailureData
+		b, _ := ioutil.ReadAll(resp.Body)
+		json.Unmarshal(b, &errorsObj)
+		if len(errorsObj.Errors) > 0 {
+			errorCode := errorsObj.Errors[0]["code"]
+			if errorCode == "already_exists" {
+				overrideIDGHTokenNumber++
+				return ensureGithubToken(acctInfo)
+			}
+		} else {
+			log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)
+			log.Fatal(string(b))
+		}
+	}
+
+	defer resp.Body.Close()
+
+	decoder := json.NewDecoder(resp.Body)
+	var respTokenData TokenInfo
+	err = decoder.Decode(&respTokenData)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return respTokenData
 }

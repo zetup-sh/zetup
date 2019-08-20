@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"os/exec"
 	"path"
 	"runtime"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -92,4 +94,15 @@ func commandExists(cmd string) bool {
 
 func isUnix() bool {
 	return runtime.GOOS == "linux" || runtime.GOOS == "darwin"
+}
+
+func readInput(prompt string) string {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf(prompt)
+	enteredData, err := reader.ReadString('\n')
+	trimmedData := strings.TrimSpace(enteredData)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return trimmedData
 }
