@@ -7,12 +7,14 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/bgentry/speakeasy"
+	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/zetup-sh/zetup/cmd/util"
 	"gopkg.in/yaml.v2"
@@ -23,50 +25,112 @@ var idCmd = &cobra.Command{
 	Use:   "id",
 	Short: "Manage identities for zetup",
 	// Long:  `adds  identities`,
-	Run: func(cmd *cobra.Command, args []string) {
-		idLists := getCurrentIdentityLists()
-		log.Println(idLists)
-	},
+	// Run: func(cmd *cobra.Command, args []string) {
+
+	// },
 }
-var idAddCmd = &cobra.Command{
-	Use:   "add",
-	Short: "add identities",
+var idUseCmd = &cobra.Command{
+	Use:   "use",
+	Short: "use identities",
 	Long:  getIDAddLngUsage(),
 	Run: func(cmd *cobra.Command, args []string) {
 		var idsInfo []tIDInfo
-		curIDLists := getCurrentIdentityLists()
 		if len(args) == 0 {
 			idsInfo = append(idsInfo, getEmptyID())
 		} else {
 			idsInfo = parseAddIDArgs(args)
 		}
-		var finalIDLists tIDLists
-		finalIDLists.List = make(map[string][]tIDInfo)
-		possibleIDTypes := []string{"github", "gitlab", "digitalocean"}
-		for _, idType := range possibleIDTypes {
-			finalIDLists.List[idType] = curIDLists.List[idType]
-		}
 
 		for _, idInfo := range idsInfo {
-			if idListContains(finalIDLists, idInfo) && !idAddOverwrite {
-				continue
-			}
 			if idInfo.Type == "github" {
 				if !checkIsGithubToken(idInfo.Password) && idAddGHToken {
 					tokenData := ensureGithubToken(idInfo)
 					idInfo.Password = tokenData.Token
 				}
+				// authorization will fail here if they provided an incorrect password
+				ensurePublicKeyGithub(idInfo)
 			}
-			finalIDLists.List[idInfo.Type] = append(finalIDLists.List[idInfo.Type], idInfo)
+			if idInfo.Type == "gitlab" {
+				ensurePublicKeyGitlab(idInfo)
+			}
+
+			mainViper.Set(idInfo.Type+".password", idInfo.Password)
+			mainViper.Set(idInfo.Type+".username", idInfo.Username)
+
+			// this will skip if it's already been set
+			getUserInfoFromGitlab(idInfo)
+			getUserInfoFromGithub()
+
+			mainViper.WriteConfig()
 		}
-
-		marshaled, err := yaml.Marshal(finalIDLists)
-		check(err)
-
-		idInfoWithHeader := []byte("# generated file do not edit\n" + string(marshaled))
-		err = ioutil.WriteFile(idFile, idInfoWithHeader, 0644)
-		check(err)
 	},
+}
+
+type ghAuthInfo struct {
+	ID  int           `json:"id"`
+	App ghAuthAppInfo `json:"app"`
+}
+
+type ghAuthAppInfo struct {
+	Name string `json:"name"`
+}
+
+var githubAPIBase = "https://api.github.com"
+var githubAPIAuthorizations = githubAPIBase + "/authorizations"
+
+// delete if it exists
+func deleteGHAuthByName(idInfo tIDInfo, name string) {
+	req, err := http.NewRequest("GET", githubAPIAuthorizations, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req.SetBasicAuth(idInfo.Username, idInfo.Password)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
+		b, _ := ioutil.ReadAll(resp.Body)
+		log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)
+		log.Fatal(string(b))
+	}
+
+	defer resp.Body.Close()
+
+	decoder := json.NewDecoder(resp.Body)
+	var respAuthData []ghAuthInfo
+	err = decoder.Decode(&respAuthData)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, authInfo := range respAuthData {
+		if authInfo.App.Name == mainViper.GetString("installation-id") {
+			deleteGHAuthByID(idInfo, strconv.Itoa(authInfo.ID))
+		}
+	}
+}
+
+func deleteGHAuthByID(idInfo tIDInfo, id string) {
+	req, err := http.NewRequest("DELETE", githubAPIAuthorizations+"/"+id, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req.SetBasicAuth(idInfo.Username, idInfo.Password)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
+		b, _ := ioutil.ReadAll(resp.Body)
+		log.Print("Coudl not delete current token")
+		log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)
+		log.Fatal(string(b))
+	}
+
+	defer resp.Body.Close()
 }
 
 func idListContains(list tIDLists, idInfo tIDInfo) bool {
@@ -82,11 +146,6 @@ type idCredentials struct {
 	Gitlab tIDInfo
 	Github tIDInfo
 }
-
-// addPublicKeyToGithub(string(publicKeyBytes), mainViper.GetString("github-token"))
-// if mainViper.GetBool("verbose") {
-// 	log.Println("ssh key pair created.")
-// }
 
 func getEmptyID() tIDInfo {
 	var acctInfo tIDInfo
@@ -112,7 +171,7 @@ func getIDParts(acctInfo tIDInfo) tIDInfo {
 	}
 	if acctInfo.Password == "" {
 		if acctInfo.Type == "github" {
-			fmt.Println("Note: A token will automatically be generated using your pasword for github accounts.")
+			fmt.Println("Note: A token will automatically be generated using your pasword for github accounts. You can override this with `--gh-token=false`")
 		} else if acctInfo.Type == "gitlab" {
 			fmt.Println("Note: gitlab passwords will be stored as plain text.\nYou can generate a token here: https://gitlab.com/profile/personal_access_tokens")
 		}
@@ -156,7 +215,7 @@ func parseIDString(idStr string) tIDInfo {
 func checkIsGithubToken(txt string) bool {
 	isghtoken, err := regexp.MatchString("^[A-Za-z0-9]{40}$", txt)
 	if err != nil {
-		log.Fatal("There was a problem checking if you provided a github token or not.")
+		log.Fatal("There was a problem checking if you provided a github token or not. This should never occur.")
 	}
 	return isghtoken
 }
@@ -164,7 +223,7 @@ func checkIsGithubToken(txt string) bool {
 func checkIsGitlabToken(txt string) bool {
 	isgltoken, err := regexp.MatchString("^[A-Za-z0-9]{20}$", txt)
 	if err != nil {
-		log.Fatal("There was a problem checking if you provided a gitlab token or not.")
+		log.Fatal("There was a problem checking if you provided a gitlab token or not. This should never occur.")
 	}
 	return isgltoken
 }
@@ -180,13 +239,12 @@ func getValidIDLngName(idType string) string {
 			}
 		}
 	}
-	log.Fatalln(getIDAddLngUsage())
-	return ""
+	return idType
 }
 
 func getIDAddLngUsage() string {
 	idAddLngUsage := `
-You can add the identity of an account (github, gitlab, etc.) with the command  "zetup id add [USER_INFORMATION]".
+You can use the identity of an account (github, gitlab, etc.) with the command  "zetup id use USER_INFORMATION]".
 
 Where user information is in the form "[ID_TYPE]/[USERNAME]:[PASSWORD]", for instance "github/sam_clem:nJim&9024". You can pass multiple accounts at once, like "zetup id add [USER_INFORMATION] [USER_INFORMATION]....
 
@@ -220,10 +278,10 @@ var idAddGHToken bool
 func init() {
 	idFile = filepath.Join(zetupDir, "identities.yml")
 	rootCmd.AddCommand(idCmd)
-	idCmd.AddCommand(idAddCmd)
-	idAddCmd.Flags().BoolVarP(&idAddAddSSH, "ssh", "", true, "add ssh key to account")
-	idAddCmd.Flags().BoolVarP(&idAddOverwrite, "overwrite", "", false, "overwrite existing accounts with the same username")
-	idAddCmd.Flags().BoolVarP(&idAddGHToken, "gh-token", "", true, "create token for github instead of using plain text password")
+	idCmd.AddCommand(idUseCmd)
+	idUseCmd.Flags().BoolVarP(&idAddAddSSH, "ssh", "", true, "add ssh key to account")
+	idUseCmd.Flags().BoolVarP(&idAddOverwrite, "overwrite", "", false, "overwrite existing accounts with the same username")
+	idUseCmd.Flags().BoolVarP(&idAddGHToken, "gh-token", "", true, "create token for github instead of using plain text password")
 }
 
 type tIDLists struct {
@@ -241,19 +299,60 @@ func getCurrentIdentityLists() tIDLists {
 	return IDLists
 }
 
-type tTokenFailureData struct {
+type githubFailureData struct {
 	Errors []map[string]string `json:"errors"`
+}
+
+var overrideIDEnsureSSHNumber = 0
+
+func ensurePublicKeyGithub(idInfo tIDInfo) {
+	installID := mainViper.GetString("installation-id")
+	if overrideIDEnsureSSHNumber != 0 {
+		installID += "-" + strconv.Itoa(overrideIDGHTokenNumber)
+	}
+	endPoint := "https://api.github.com/user/keys"
+	pubKey := getSSHPubKey()
+	body := strings.NewReader(fmt.Sprintf(`{
+				"title": "%v",
+				"key": "%v"
+			}`, installID, strings.TrimRight(pubKey, "\n")))
+	req, err := http.NewRequest("POST", endPoint, body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req.SetBasicAuth(idInfo.Username, idInfo.Password)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
+		b, _ := ioutil.ReadAll(resp.Body)
+		var errorsObj githubFailureData
+		json.Unmarshal(b, &errorsObj)
+		if len(errorsObj.Errors) > 0 {
+			errorMessage := errorsObj.Errors[0]["message"]
+			if errorMessage == "key is already in use" {
+				// already have that key, that's success
+				return
+			}
+		} else {
+			log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)
+			log.Fatal(string(b))
+		}
+	}
+
+	defer resp.Body.Close()
 }
 
 var overrideIDGHTokenNumber = 0
 
-func ensureGithubToken(acctInfo tIDInfo) TokenInfo {
+func ensureGithubToken(acctInfo tIDInfo) tTokenInfo {
 	installID := mainViper.GetString("installation-id")
-	if overrideIDGHTokenNumber != 0 {
-		installID += "-" + strconv.Itoa(overrideIDGHTokenNumber)
-	}
 	// send token request
-	data := TokenPayload{
+	data := tTokenPayload{
 		Note: installID,
 		Scopes: []string{
 			"repo",
@@ -287,13 +386,13 @@ func ensureGithubToken(acctInfo tIDInfo) TokenInfo {
 		log.Fatal(err)
 	}
 	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
-		var errorsObj tTokenFailureData
+		var errorsObj githubFailureData
 		b, _ := ioutil.ReadAll(resp.Body)
 		json.Unmarshal(b, &errorsObj)
 		if len(errorsObj.Errors) > 0 {
 			errorCode := errorsObj.Errors[0]["code"]
 			if errorCode == "already_exists" {
-				overrideIDGHTokenNumber++
+				deleteGHAuthByName(acctInfo, installationID)
 				return ensureGithubToken(acctInfo)
 			}
 		} else {
@@ -305,11 +404,190 @@ func ensureGithubToken(acctInfo tIDInfo) TokenInfo {
 	defer resp.Body.Close()
 
 	decoder := json.NewDecoder(resp.Body)
-	var respTokenData TokenInfo
+	var respTokenData tTokenInfo
 	err = decoder.Decode(&respTokenData)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	return respTokenData
+}
+
+func ensurePublicKeyGitlab(idInfo tIDInfo) {
+	installID := mainViper.GetString("installation-id")
+	glTemporaryToken := getTemporaryGitlabToken(idInfo)
+	pubKey := getSSHPubKey()
+	endPoint := "https://gitlab.com/api/v4/user/keys"
+	body := strings.NewReader(fmt.Sprintf(`{
+				"title": "%v",
+				"key": "%v"
+			}`, installID, strings.TrimRight(pubKey, "\n")))
+	req, err := http.NewRequest("POST", endPoint, body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// req.SetBasicAuth(idInfo.Username, idInfo.Password)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+glTemporaryToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
+		if resp.StatusCode == 400 {
+			// just saying it's already been taken, probably
+			return
+		}
+		b, _ := ioutil.ReadAll(resp.Body)
+		log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)
+		log.Fatal(string(b))
+	}
+}
+
+func getTemporaryGitlabToken(idInfo tIDInfo) string {
+	endPoint := "https://gitlab.com/oauth/token"
+	body := strings.NewReader(fmt.Sprintf(`{
+	"grant_type" : "password",
+	"username": "%s",
+	"password": "%s"
+}`, idInfo.Username, idInfo.Password))
+	req, err := http.NewRequest("POST", endPoint, body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	b, _ := ioutil.ReadAll(resp.Body)
+	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
+		log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)
+		log.Fatal(string(b))
+	}
+	var respTokenData tTokenInfo
+	err = json.Unmarshal(b, &respTokenData)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return respTokenData.AccessToken
+}
+
+func getUserInfoFromGitlab(idInfo tIDInfo) {
+	viperUserInfo := mainViper.GetStringMapString("user")
+	userInfo.Email = viperUserInfo["email"]
+	userInfo.Name = viperUserInfo["name"]
+	userInfo.GithubUsername = mainViper.GetString("gitlab.username")
+
+	if userInfo.GithubUsername == "" || userInfo.Name != "" || userInfo.Email != "" {
+		return
+	}
+
+	// get info with personal access token
+	req, err := http.NewRequest("GET", "https://gitlab.com/v4/api/user", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer "+getTemporaryGitlabToken(idInfo))
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
+		b, _ := ioutil.ReadAll(resp.Body)
+		log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)
+		log.Println(string(b))
+		log.Println("We could not retrieve your user information. This is a non fatal error")
+	}
+
+	defer resp.Body.Close()
+
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&userInfo)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// write token to file
+	mainViper.Set("user.name", userInfo.Name)
+	mainViper.Set("user.email", userInfo.Email)
+
+}
+
+func getUserInfoFromGithub() {
+	viperUserInfo := mainViper.GetStringMapString("user")
+	userInfo.Email = viperUserInfo["email"]
+	userInfo.Name = viperUserInfo["name"]
+
+	username := mainViper.GetString("github.username")
+	password := mainViper.GetString("github.password")
+
+	if userInfo.GithubUsername == "" || userInfo.Name != "" || userInfo.Email != "" {
+		return
+	}
+
+	// get info with personal access token
+	req, err := http.NewRequest("GET", "https://api.github.com/user", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	req.SetBasicAuth(username, password)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
+		b, _ := ioutil.ReadAll(resp.Body)
+		log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)
+		log.Fatal(string(b))
+	}
+
+	defer resp.Body.Close()
+
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&userInfo)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// write token to file
+	mainViper.Set("user.name", userInfo.Name)
+	mainViper.Set("user.email", userInfo.Email)
+}
+
+func writeGitConfig() {
+	gitConfigFile := fmt.Sprintf(`[user]
+	name = %v
+	email = %v
+`, mainViper.Get("user.name"), mainViper.Get("user.email"))
+	home, _ := homedir.Dir()
+	_ = ioutil.WriteFile(path.Join(home, ".gitconfig"), []byte(gitConfigFile), 0644)
+}
+
+type tUserInfo struct {
+	GithubUsername string `json:"login"`
+	Email          string `json:"email"`
+	Name           string `json:"name"`
+}
+
+var userInfo tUserInfo
+
+type tTokenInfo struct {
+	Token       string `json:"token"`
+	AccessToken string `json:"access_token"`
+}
+
+type tTokenPayload struct {
+	Note   string   `json:"note"`
+	Scopes []string `json:"scopes"`
 }

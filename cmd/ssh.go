@@ -43,6 +43,7 @@ var sshGenerateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "generate ssh key for zetup",
 	Run: func(cmd *cobra.Command, args []string) {
+		log.Println("called generate")
 		publicKeyFile := mainViper.GetString("public-key-file")
 		privateKeyFile := mainViper.GetString("private-key-file")
 		if mainViper.GetString("ssh-key-id") != "" {
@@ -62,6 +63,7 @@ type sshKeyInfo struct {
 
 func init() {
 	rootCmd.AddCommand(sshCmd)
+	sshCmd.AddCommand(sshGenerateCmd)
 }
 
 func ensureSSHKey() {
@@ -104,6 +106,7 @@ func ensureSSHKey() {
 }
 
 func getSSHPubKey() string {
+	publicKeyFile := mainViper.GetString("public-key-file")
 	if util.Exists(publicKeyFile) {
 		dat, err := ioutil.ReadFile(publicKeyFile)
 		check(err)

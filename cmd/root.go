@@ -1,25 +1,18 @@
 package cmd
 
 import (
-	"bufio"
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	mathrand "math/rand"
-	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/bgentry/speakeasy"
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/spf13/cobra"
 
@@ -53,7 +46,7 @@ var githubPassword string
 var email string
 var zetupDir string
 var bakDir string
-var installationId string
+var installationID string
 var privateKeyFile string
 var publicKeyFile string
 var githubToken string
@@ -105,7 +98,7 @@ func init() {
 		"where zetup stores its files (default is $HOME/.zetup)")
 	rootCmd.PersistentFlags().StringVarP(&pkgDir, "pkg-dir", "", "",
 		"where zetup stores zetup packages (default is $ZETUP_DIR/pkg)")
-	rootCmd.PersistentFlags().StringVarP(&installationId, "installation-id", "",
+	rootCmd.PersistentFlags().StringVarP(&installationID, "installation-id", "",
 		"", "installation id used for this particular installation of zetup (for"+
 			"github keys/tokens and other things)")
 	rootCmd.PersistentFlags().StringVarP(&githubToken, "github-token", "", "",
@@ -181,8 +174,8 @@ func initConfig() {
 		emptyFile.Close()
 	}
 
-	installationId = mainViper.GetString("installation-id")
-	if installationId == "" {
+	installationID = mainViper.GetString("installation-id")
+	if installationID == "" {
 		// create installation id if not present
 		hostname, err := os.Hostname()
 		username := os.Getenv("USER")
@@ -191,8 +184,8 @@ func initConfig() {
 		if err != nil {
 			panic(err)
 		}
-		installationId = fmt.Sprintf("zetup-%v-%v-%v", hostname, username, randWords)
-		mainViper.Set("installation-id", installationId)
+		installationID = fmt.Sprintf("zetup-%v-%v-%v", hostname, username, randWords)
+		mainViper.Set("installation-id", installationID)
 	}
 
 	publicKeyFile := mainViper.GetString("public-key-file")
@@ -211,203 +204,4 @@ func initConfig() {
 	_ = os.Mkdir(bakDir, 0755)
 
 	linkBackupFile = path.Join(zetupDir, ".link-backup")
-
-	ensureToken()
-	getUserInfo()
-	writeGitConfig()
-	ensureSSHKey()
-	mainViper.WriteConfig()
-}
-
-func addPublicKeyToGithub(pubKey string, githubToken string) {
-	body := strings.NewReader(fmt.Sprintf(`{
-				"title": "%v",
-				"key": "%v"
-			}`, mainViper.GetString("installation-id"), strings.TrimRight(pubKey, "\n")))
-	req, err := http.NewRequest("POST", "https://api.github.com/user/keys", body)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	req.SetBasicAuth(mainViper.GetString("github-username"), githubToken)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
-		b, _ := ioutil.ReadAll(resp.Body)
-		log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)
-		log.Fatal(string(b))
-	}
-
-	defer resp.Body.Close()
-
-	decoder := json.NewDecoder(resp.Body)
-	var sshKeyInfo sshKeyInfo
-	err = decoder.Decode(&sshKeyInfo)
-	if err != nil {
-		log.Fatal(err)
-	}
-	mainViper.Set("ssh-key-id", sshKeyInfo.ID)
-}
-
-func check(err error) {
-	if err != nil {
-		debug.PrintStack()
-		log.Fatal(err)
-	}
-}
-
-func writeGitConfig() {
-	gitConfigFile := fmt.Sprintf(`[user]
-	name = %v
-	email = %v
-`, mainViper.Get("user.name"), mainViper.Get("user.email"))
-	home, _ := homedir.Dir()
-	_ = ioutil.WriteFile(path.Join(home, ".gitconfig"), []byte(gitConfigFile), 0644)
-}
-
-type UserInfo struct {
-	GithubUsername string `json:"login"`
-	Email          string `json:"email"`
-	Name           string `json:"name"`
-}
-
-var userInfo UserInfo
-
-func getUserInfo() {
-	viperUserInfo := mainViper.GetStringMapString("user")
-	userInfo.Email = viperUserInfo["email"]
-	userInfo.Name = viperUserInfo["name"]
-	userInfo.GithubUsername = mainViper.GetString("github-username")
-
-	if userInfo.GithubUsername != "" && userInfo.Name != "" && userInfo.Email != "" {
-		return
-	}
-
-	log.Println("getting from api")
-
-	// get info with personal access token
-	req, err := http.NewRequest("GET", "https://api.github.com/user", nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	tokenHeader := fmt.Sprintf("token %v", mainViper.GetString("github-token"))
-	req.Header.Set("Authorization", tokenHeader)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
-		b, _ := ioutil.ReadAll(resp.Body)
-		log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)
-		log.Fatal(string(b))
-	}
-
-	defer resp.Body.Close()
-
-	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(&userInfo)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// write token to file
-	mainViper.Set("user.name", userInfo.Name)
-	mainViper.Set("user.email", userInfo.Email)
-}
-
-type TokenInfo struct {
-	Id    int    `json:"id"`
-	Token string `json:"token"`
-}
-
-type TokenPayload struct {
-	Note   string   `json:"note"`
-	Scopes []string `json:"scopes"`
-}
-
-func ensureToken() {
-	githubToken = mainViper.GetString("github-token")
-
-	if mainViper.GetString("github-token") != "" {
-		return
-	}
-	// get github username and password
-	githubUsername := mainViper.GetString("github-username")
-	if githubUsername == "" {
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Printf("Github Username (%v): ", os.Getenv("USER"))
-		enteredUsername, err := reader.ReadString('\n')
-		githubUsername = strings.Trim(enteredUsername, " ")
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	password := mainViper.GetString("github-password")
-	if password == "" {
-		password, err = speakeasy.Ask("Github Password: ")
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	// send token request
-	data := TokenPayload{
-		Note: mainViper.GetString("installation-id"),
-		Scopes: []string{
-			"repo",
-			"admin:org",
-			"admin:public_key",
-			"admin:repo_hook",
-			"gist",
-			"notifications",
-			"user",
-			"delete_repo",
-			"write:discussion",
-			"admin:gpg_key",
-		},
-	}
-	payloadBytes, err := json.Marshal(data)
-	if err != nil {
-		log.Fatal(err)
-	}
-	body := bytes.NewReader(payloadBytes)
-
-	req, err := http.NewRequest("POST", "https://api.github.com/authorizations", body)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	req.SetBasicAuth(githubUsername, password)
-	log.Println("sending", githubUsername, password)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
-		b, _ := ioutil.ReadAll(resp.Body)
-		log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)
-		log.Fatal(string(b))
-	}
-
-	defer resp.Body.Close()
-
-	decoder := json.NewDecoder(resp.Body)
-	var respTokenData TokenInfo
-	err = decoder.Decode(&respTokenData)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// write token to file
-	mainViper.Set("github-token", respTokenData.Token)
-	mainViper.Set("github-token-id", respTokenData.Id)
-	mainViper.Set("github-username", githubUsername)
 }

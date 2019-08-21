@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path"
 	"runtime"
+	"runtime/debug"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -105,4 +106,20 @@ func readInput(prompt string) string {
 		log.Fatal(err)
 	}
 	return trimmedData
+}
+
+func contains(a []string, x string) bool {
+	for _, n := range a {
+		if x == n {
+			return true
+		}
+	}
+	return false
+}
+
+func check(err error) {
+	if err != nil {
+		debug.PrintStack()
+		log.Fatal(err)
+	}
 }
