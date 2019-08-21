@@ -41,29 +41,33 @@ var idUseCmd = &cobra.Command{
 			idsInfo = parseAddIDArgs(args)
 		}
 
-		for _, idInfo := range idsInfo {
-			if idInfo.Type == "github" {
-				if !checkIsGithubToken(idInfo.Password) && idAddGHToken {
-					tokenData := ensureGithubToken(idInfo)
-					idInfo.Password = tokenData.Token
-				}
-				// authorization will fail here if they provided an incorrect password
-				ensurePublicKeyGithub(idInfo)
-			}
-			if idInfo.Type == "gitlab" {
-				ensurePublicKeyGitlab(idInfo)
-			}
-
-			mainViper.Set(idInfo.Type+".password", idInfo.Password)
-			mainViper.Set(idInfo.Type+".username", idInfo.Username)
-
-			// this will skip if it's already been set
-			getUserInfoFromGitlab(idInfo)
-			getUserInfoFromGithub()
-
-			mainViper.WriteConfig()
-		}
 	},
+}
+
+// creates tokens, adds public keys, etc.
+func idsInitialize(idsInfo []tIDInfo) {
+	for _, idInfo := range idsInfo {
+		if idInfo.Type == "github" {
+			if !checkIsGithubToken(idInfo.Password) && idAddGHToken {
+				tokenData := ensureGithubToken(idInfo)
+				idInfo.Password = tokenData.Token
+			}
+			// authorization will fail here if they provided an incorrect password
+			ensurePublicKeyGithub(idInfo)
+		}
+		if idInfo.Type == "gitlab" {
+			ensurePublicKeyGitlab(idInfo)
+		}
+
+		mainViper.Set(idInfo.Type+".password", idInfo.Password)
+		mainViper.Set(idInfo.Type+".username", idInfo.Username)
+
+		// this will skip if it's already been set
+		getUserInfoFromGitlab(idInfo)
+		getUserInfoFromGithub()
+
+		mainViper.WriteConfig()
+	}
 }
 
 type ghAuthInfo struct {
@@ -571,7 +575,10 @@ func writeGitConfig() {
 	email = %v
 `, mainViper.Get("user.name"), mainViper.Get("user.email"))
 	home, _ := homedir.Dir()
-	_ = ioutil.WriteFile(path.Join(home, ".gitconfig"), []byte(gitConfigFile), 0644)
+	gitconfigFile := path.Join(home, ".gitconfig")
+	if !util.Exists(gitconfigFile) {
+		_ = ioutil.WriteFile(gitconfigFile, []byte(gitConfigFile), 0644)
+	}
 }
 
 type tUserInfo struct {

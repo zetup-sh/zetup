@@ -1,15 +1,19 @@
 #!/bin/bash
 
 
-package=$1
-if [[ -z "$package" ]]; then
-  echo "usage: $0 <package-name>"
-  exit 1
-fi
+package="github.com/zetup-sh/zetup"
+
 package_split=(${package//\// })
 package_name=${package_split[-1]}
 
-platforms=("windows/amd64" "windows/386" "darwin/amd64" "linux/amd64")
+mkdir -p build
+rm -rf build/*
+cd build
+platforms=("$1")
+if [[ -z "$1" ]]; then
+  echo "1 was not set"
+  platforms=("linux/amd64" "linux/386" "windows/amd64" "windows/386" "darwin/amd64")
+fi
 
 for platform in "${platforms[@]}"
 do
@@ -22,15 +26,10 @@ do
   fi
 
   echo "Running env GOOS=$GOOS GOARCH=$GOARCH go build -o build/$output_name $package"
-  env GOOS=$GOOS GOARCH=$GOARCH go build -o build/$output_name $package
+  env GOOS=$GOOS GOARCH=$GOARCH go build -o $output_name $package
   if [ $? -ne 0 ]; then
     echo 'An error has occurred! Aborting the script execution...'
     exit 1
   fi
-done
-
-cd ./build
-for f in ./*
-do
-  zip  "$f.zip" "$f"
+  zip  "$output_name.zip" "$output_name"
 done
