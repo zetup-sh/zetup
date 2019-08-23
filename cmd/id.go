@@ -7,13 +7,14 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/bgentry/speakeasy"
+	"github.com/manifoldco/promptui"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/zetup-sh/zetup/cmd/util"
@@ -152,39 +153,46 @@ type idCredentials struct {
 }
 
 func getEmptyID() tIDInfo {
-	var acctInfo tIDInfo
-	return getIDParts(acctInfo)
+	var idInfo tIDInfo
+	return getIDParts(idInfo)
 }
 
 func parseAddIDArgs(args []string) (idsInfo []tIDInfo) {
 	for _, arg := range args {
-		curAcctInfo := parseIDString(arg)
-		idsInfo = append(idsInfo, getIDParts(curAcctInfo))
+		curIDInfo := parseIDString(arg)
+		idsInfo = append(idsInfo, getIDParts(curIDInfo))
 	}
 	return idsInfo
 }
 
-func getIDParts(acctInfo tIDInfo) tIDInfo {
-	if acctInfo.Type == "" {
+func getIDParts(idInfo tIDInfo) tIDInfo {
+	if idInfo.Type == "" {
 		userInput := readInput("Please enter id type (github, gitlab, digitalocean, etc.): ")
-		acctInfo.Type = getValidIDLngName(strings.ToLower(userInput))
+		idInfo.Type = getValidIDLngName(strings.ToLower(userInput))
 	}
-	titleType := strings.Title(acctInfo.Type)
-	if acctInfo.Username == "" {
-		acctInfo.Username = readInput(titleType + " username: ")
+	titleType := strings.Title(idInfo.Type)
+	if idInfo.Username == "" {
+		idInfo.Username = readInput(titleType + " username: ")
 	}
-	if acctInfo.Password == "" {
-		if acctInfo.Type == "github" {
-			fmt.Println("Note: A token will automatically be generated using your pasword for github accounts. You can override this with `--gh-token=false`")
-		} else if acctInfo.Type == "gitlab" {
+	if idInfo.Password == "" {
+		if idInfo.Type == "github" {
+			fmt.Println("Note: A token will automatically be generated using your password for github accounts. You can override this with `--gh-token=false`")
+		} else if idInfo.Type == "gitlab" {
 			fmt.Println("Note: gitlab passwords will be stored as plain text.\nYou can generate a token here: https://gitlab.com/profile/personal_access_tokens")
 		}
-		userInput, err := speakeasy.Ask(titleType + " " +
-			acctInfo.Username + " password or token: ")
-		check(err)
-		acctInfo.Password = userInput
+		prompt := promptui.Prompt{
+			Label: titleType + " " + idInfo.Username + " password or token: ",
+			Mask:  '*',
+		}
+
+		userInput, err := prompt.Run()
+		if err != nil {
+			fmt.Println("signal interrupt detected")
+			os.Exit(1)
+		}
+		idInfo.Password = userInput
 	}
-	return acctInfo
+	return idInfo
 }
 
 type tIDInfo struct {
@@ -194,26 +202,26 @@ type tIDInfo struct {
 }
 
 func parseIDString(idStr string) tIDInfo {
-	var acctInfo tIDInfo
+	var idInfo tIDInfo
 	nextStr := ""
 	if strings.Contains(idStr, "/") {
 		splitVals := strings.Split(idStr, "/")
-		acctInfo.Type = getValidIDLngName(splitVals[0])
+		idInfo.Type = getValidIDLngName(splitVals[0])
 		nextStr = splitVals[1]
 	} else {
-		acctInfo.Type = getValidIDLngName(idStr)
+		idInfo.Type = getValidIDLngName(idStr)
 	}
 
 	if nextStr != "" {
 		if strings.Contains(nextStr, ":") {
 			splitVals := strings.Split(nextStr, ":")
-			acctInfo.Username = splitVals[0]
-			acctInfo.Password = splitVals[1]
+			idInfo.Username = splitVals[0]
+			idInfo.Password = splitVals[1]
 		} else {
-			acctInfo.Username = nextStr
+			idInfo.Username = nextStr
 		}
 	}
-	return acctInfo
+	return idInfo
 }
 
 func checkIsGithubToken(txt string) bool {
@@ -353,7 +361,7 @@ func ensurePublicKeyGithub(idInfo tIDInfo) {
 
 var overrideIDGHTokenNumber = 0
 
-func ensureGithubToken(acctInfo tIDInfo) tTokenInfo {
+func ensureGithubToken(idInfo tIDInfo) tTokenInfo {
 	installID := mainViper.GetString("installation-id")
 	// send token request
 	data := tTokenPayload{
@@ -382,7 +390,7 @@ func ensureGithubToken(acctInfo tIDInfo) tTokenInfo {
 		log.Fatal(err)
 	}
 
-	req.SetBasicAuth(acctInfo.Username, acctInfo.Password)
+	req.SetBasicAuth(idInfo.Username, idInfo.Password)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -396,8 +404,8 @@ func ensureGithubToken(acctInfo tIDInfo) tTokenInfo {
 		if len(errorsObj.Errors) > 0 {
 			errorCode := errorsObj.Errors[0]["code"]
 			if errorCode == "already_exists" {
-				deleteGHAuthByName(acctInfo, installationID)
-				return ensureGithubToken(acctInfo)
+				deleteGHAuthByName(idInfo, installationID)
+				return ensureGithubToken(idInfo)
 			}
 		} else {
 			log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)

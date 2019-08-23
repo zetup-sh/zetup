@@ -71,7 +71,7 @@ func FindFile(
 	}
 }
 
-func runFile(cmdFilePath string) {
+func runFile(cmdFilePath string) error {
 	err := os.Chmod(cmdFilePath, 0755)
 	if err != nil {
 		fmt.Println(err)
@@ -82,10 +82,7 @@ func runFile(cmdFilePath string) {
 	runCmd.Stdout = os.Stdout
 	runCmd.Stdin = os.Stdin
 	runCmd.Stderr = os.Stderr
-	err = runCmd.Run()
-	if err != nil {
-		log.Fatalf("%s %s\n", cmdFilePath, err)
-	}
+	return runCmd.Run()
 }
 
 func commandExists(cmd string) bool {
@@ -95,6 +92,17 @@ func commandExists(cmd string) bool {
 
 func isUnix() bool {
 	return runtime.GOOS == "linux" || runtime.GOOS == "darwin"
+}
+
+func readConfirm(prompt string) bool {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf(prompt)
+	enteredData, err := reader.ReadString('\n')
+	trimmedData := strings.TrimSpace(enteredData)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return strings.HasPrefix(strings.ToLower(trimmedData), "y")
 }
 
 func readInput(prompt string) string {

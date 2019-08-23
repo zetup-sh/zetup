@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -43,13 +44,15 @@ var sshGenerateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "generate ssh key for zetup",
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Println("called generate")
 		publicKeyFile := mainViper.GetString("public-key-file")
 		privateKeyFile := mainViper.GetString("private-key-file")
 		if mainViper.GetString("ssh-key-id") != "" {
 			if _, err := os.Stat(publicKeyFile); !os.IsNotExist(err) {
 				if _, err := os.Stat(privateKeyFile); !os.IsNotExist(err) {
-					log.Fatalln("ssh key " + publicKeyFile + ", " + privateKeyFile + " already exists.")
+					if verbose {
+						fmt.Println("ssh key " + publicKeyFile + ", " + privateKeyFile + " already exists.")
+						os.Exit(1)
+					}
 				}
 			}
 		}
@@ -76,7 +79,7 @@ func ensureSSHKey() {
 			}
 		}
 	}
-	if mainViper.GetBool("verbose") {
+	if verbose {
 		log.Println("creating ssh key pair...")
 	}
 

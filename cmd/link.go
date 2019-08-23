@@ -36,7 +36,6 @@ var linkVerbose bool
 func init() {
 	rootCmd.AddCommand(linkCmd)
 	linkCmd.Flags().BoolVarP(&linkNoOverwrite, "no-overwrite", "n", false, "don't overwrite existing target files")
-	linkCmd.Flags().BoolVarP(&linkVerbose, "verbose", "v", false, "tell you if it's ignoring overwrite")
 }
 
 func linkFile(source string, target string) {
@@ -60,7 +59,7 @@ func linkFile(source string, target string) {
 		}
 		for _, backedupFile := range backedupFiles {
 			if backedupFile.Location == target {
-				if linkVerbose {
+				if verbose {
 					log.Println("file already backed up " + target)
 				}
 				return

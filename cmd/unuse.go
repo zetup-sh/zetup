@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"runtime"
@@ -27,9 +28,14 @@ func unuse() {
 	restoreLinkFiles()
 	unuseFile, err := FindFile(usePkgDir, "unuse", runtime.GOOS, unixExtensions, mainViper)
 	if err == nil {
-		runFile(unuseFile)
+		err = runFile(unuseFile)
 	}
-	mainViper.Set("use-pkg", "")
+	if err != nil {
+		fmt.Println("There was a problem running the current `unuse` file")
+		fmt.Printf("%s %s\n", unuseFile, err)
+		fmt.Println("Probably nothing to worry about. Continuing...")
+	}
+	mainViper.Set("cur-pkg", "")
 	mainViper.WriteConfig()
 }
 
@@ -44,4 +50,5 @@ func restoreLinkFiles() {
 		check(err)
 		ioutil.WriteFile(backedupFile.Location, []byte(backedupFile.Contents), 0644)
 	}
+	ioutil.WriteFile(linkBackupFile, []byte(""), 0644)
 }

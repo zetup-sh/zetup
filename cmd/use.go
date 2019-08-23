@@ -1,10 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -23,30 +24,44 @@ var useCmd = &cobra.Command{
 	Short: "Specify a zetup package to use",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		pkgToInstall := args[0]
-		ensureRepo(pkgToInstall)
-
-		pkgViper = viper.New()
-		pkgViper.AddConfigPath(usePkgDir)
-		pkgViper.SetConfigName("config")
-		if err := pkgViper.ReadInConfig(); err != nil {
-			if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-				log.Println("Your package must contain a config.yml")
-				log.Println("Tip: You can use `zetup generate` to create a skeleton project or `zetup fork` to fork your favorite zetup package.")
-			} else {
-				log.Printf("err = %+v\n", err)
-			}
-		}
-
-		unuse()
-		useFile, err := FindFile(usePkgDir, "use", runtime.GOOS, unixExtensions, mainViper)
-		if err == nil {
-			runFile(useFile)
-		}
-
-		mainViper.Set("cur-pkg", usePkgDir)
-		mainViper.WriteConfig()
+		usePkg(args[0])
 	},
+}
+
+func usePkg(pkgToInstall string) {
+	repo := parseRepoName(pkgToInstall)
+	usePkgDir = filepath.Join(pkgDir, repo.Joined)
+
+	ensureRepo(repo, usePkgDir)
+
+	pkgViper = viper.New()
+	pkgViper.AddConfigPath(usePkgDir)
+	pkgViper.SetConfigName("config")
+	if err := pkgViper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			log.Println("Your package must contain a config.yml")
+			log.Println("Tip: You can use `zetup generate` to create a skeleton project or `zetup fork` to fork your favorite zetup package.")
+		} else {
+			log.Printf("err = %+v\n", err)
+		}
+	}
+
+	unuse()
+	useFile, err := FindFile(usePkgDir, "use", runtime.GOOS, unixExtensions, mainViper)
+	if err == nil {
+		if verbose {
+			vLog.Printf("running use file %s\n", useFile)
+		}
+		err = runFile(useFile)
+	}
+
+	if err != nil {
+		log.Println("There was a problem running the use file.")
+		log.Fatalln(useFile, err)
+	}
+
+	mainViper.Set("cur-pkg", usePkgDir)
+	mainViper.WriteConfig()
 }
 
 func init() {
@@ -56,57 +71,76 @@ func init() {
 var usePkgDir string
 var usePkgDirParent string
 
-func ensureRepo(repo string) {
+type repoInfo struct {
+	Hostname string
+	Username string
+	Reponame string
+	Joined   string
+}
+
+func parseRepoName(repo string) repoInfo {
 	splitPath := strings.Split(repo, "/")
+	ghUsername := mainViper.GetString("github.username")
+	glUsername := mainViper.GetString("gitlab.username")
 	if len(splitPath) == 1 {
-		splitPath = []string{"github.com", mainViper.GetString("github-username"), splitPath[0]}
+		if ghUsername != "" {
+			splitPath = []string{"github.com", ghUsername, splitPath[0]}
+		} else if glUsername != "" {
+			splitPath = []string{"gitlab.com", glUsername, splitPath[0]}
+		} else {
+			fmt.Println("You don't have any accounts to extrapolate the full path from, so you'll have to provide the full path, e.g. github.com/zetup-sh/zetup-pkg.")
+			fmt.Println("Or you can add a new account with `zetup id add`")
+			os.Exit(1)
+		}
 	}
-	if len(splitPath) != 3 || splitPath[0] != "github.com" {
-		log.Fatal("Only github is supported for now.")
+	if len(splitPath) != 3 || !(splitPath[0] == "github.com" || splitPath[0] == "gitlab.com") {
+		fmt.Println("repos must be in the format [hostname]/[username]/reponame], e.g. github.com/zetup-sh/zetup-pkg")
+		fmt.Println("Only github/gitlab are supported for now.")
+		os.Exit(1)
 	}
+	return repoInfo{
+		Hostname: splitPath[0],
+		Username: splitPath[1],
+		Reponame: splitPath[2],
+		Joined:   filepath.Join(splitPath...),
+	}
+}
 
-	usePkgDir = pkgDir + string(os.PathSeparator) + path.Join(splitPath...)
-	usePkgDirParent, _ = path.Split(usePkgDir)
-	err := os.MkdirAll(usePkgDirParent, 0755)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+func ensureRepo(repo repoInfo, localPath string) {
 	if _, err := os.Stat(usePkgDir); os.IsNotExist(err) {
-		if mainViper.GetBool("verbose") {
-			log.Println(path.Join(splitPath...) + " not found, cloning...")
+		err := os.MkdirAll(filepath.Dir(localPath), 0755)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if verbose {
+			log.Println(repo.Joined, " not found, cloning...")
 		}
 
 		var url string
-		username := splitPath[1]
-		githubUsername := mainViper.GetString("github-username")
+		hosttype := getValidIDLngName(repo.Hostname)
+		username := mainViper.GetString(hosttype + ".username")
 		var r *git.Repository
-		if githubUsername != username {
-			url = "https://github.com/" + username + "/" + splitPath[2] + ".git"
-			r, err = git.PlainClone(usePkgDir, false, &git.CloneOptions{
+		if repo.Username != username {
+			url = fmt.Sprintf("https://%s/%s/%s.git", repo.Hostname, repo.Username, repo.Reponame)
+			r, err = git.PlainClone(localPath, false, &git.CloneOptions{
 				URL:               url,
 				RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
 			})
 		} else {
 			privateKeyFile := mainViper.GetString("private-key-file")
-
 			pem, _ := ioutil.ReadFile(privateKeyFile)
 			signer, _ := ssh.ParsePrivateKey(pem)
 			auth := &ssh2.PublicKeys{User: "git", Signer: signer}
-			url = "git@github.com:" + username + "/" + splitPath[2] + ".git"
-			r, err = git.PlainClone(usePkgDir, false, &git.CloneOptions{
+			url = fmt.Sprintf("git@github.com:%s/%s.git", repo.Username, repo.Reponame)
+			r, err = git.PlainClone(localPath, false, &git.CloneOptions{
 				URL:               url,
 				RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
 				Auth:              auth,
 			})
 		}
 
-		if err != nil {
-			log.Fatal(err)
-		}
+		check(err)
 		_, err = r.Head()
-		if err != nil {
-			log.Fatal(err)
-		}
+		check(err)
 	}
 }

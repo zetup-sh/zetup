@@ -14,6 +14,7 @@ import (
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -35,6 +36,8 @@ func Execute() {
 		os.Exit(1)
 	}
 }
+
+var vLog = color.New(color.FgCyan)
 
 var unixExtensions = []string{"", ".sh", ".bash", ".zsh"}
 var mainViper *viper.Viper
@@ -90,10 +93,6 @@ func init() {
 	// will be global for your application.
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "",
 		"config file (default is $HOME/.zetup/config.yml)")
-	rootCmd.PersistentFlags().StringVarP(&githubUsername, "github-username",
-		"", "", "your github username (default is $USER)")
-	rootCmd.PersistentFlags().StringVarP(&githubPassword, "github-password",
-		"", "", "your github password, only needed for creating token")
 	rootCmd.PersistentFlags().StringVarP(&zetupDir, "zetup-dir", "z", "",
 		"where zetup stores its files (default is $HOME/.zetup)")
 	rootCmd.PersistentFlags().StringVarP(&pkgDir, "pkg-dir", "", "",
@@ -101,8 +100,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&installationID, "installation-id", "",
 		"", "installation id used for this particular installation of zetup (for"+
 			"github keys/tokens and other things)")
-	rootCmd.PersistentFlags().StringVarP(&githubToken, "github-token", "", "",
-		"github personal access token")
 	rootCmd.PersistentFlags().StringVarP(&publicKeyFile, "public-key-file", "", "",
 		"ssh public key file")
 	rootCmd.PersistentFlags().StringVarP(
@@ -150,7 +147,6 @@ func init() {
 func initConfig() {
 	home, err := homedir.Dir()
 
-	mainViper.Set("verbose", verbose)
 	pkgDir = mainViper.GetString("pkg-dir")
 	if pkgDir == "" {
 		pkgDir = path.Join(zetupDir, "pkg")
