@@ -78,7 +78,7 @@ func runFile(cmdFilePath string) error {
 	}
 
 	runCmd := exec.Command(cmdFilePath)
-	runCmd.Env = append(os.Environ(), "ZETUP_USE_PKG="+usePkgDir)
+	runCmd.Env = append(os.Environ(), "ZETUP_CUR_PKG="+usePkgDir)
 	runCmd.Stdout = os.Stdout
 	runCmd.Stdin = os.Stdin
 	runCmd.Stderr = os.Stderr
