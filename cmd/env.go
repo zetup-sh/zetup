@@ -18,16 +18,9 @@ var envCmd = &cobra.Command{
 	prefix default on windows is "$env:", and "export " or "set " on unix systems (depending on which command exists)
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
-
-		// TODO:.windows, and I think some
-		// linux distros don't know "export"
 		if prefix == "" {
 			if isUnix() {
-				if commandExists("export") {
-					prefix = "export "
-				} else if commandExists("set") {
-					prefix = "set "
-				}
+				prefix = "export "
 			} else {
 				prefix = "$env:"
 			}

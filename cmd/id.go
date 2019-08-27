@@ -41,8 +41,17 @@ var idUseCmd = &cobra.Command{
 		} else {
 			idsInfo = parseAddIDArgs(args)
 		}
-
+		idsInitialize(idsInfo)
 	},
+}
+
+func init() {
+	idFile = filepath.Join(zetupDir, "identities.yml")
+	rootCmd.AddCommand(idCmd)
+	idCmd.AddCommand(idUseCmd)
+	idUseCmd.Flags().BoolVarP(&idAddAddSSH, "ssh", "", true, "add ssh key to account")
+	idUseCmd.Flags().BoolVarP(&idAddOverwrite, "overwrite", "", false, "overwrite existing accounts with the same username")
+	idUseCmd.Flags().BoolVarP(&idAddGHToken, "gh-token", "", true, "create token for github instead of using plain text password")
 }
 
 // creates tokens, adds public keys, etc.
@@ -287,15 +296,6 @@ var idAddAddSSH bool
 var idAddOverwrite bool
 var idAddGHToken bool
 
-func init() {
-	idFile = filepath.Join(zetupDir, "identities.yml")
-	rootCmd.AddCommand(idCmd)
-	idCmd.AddCommand(idUseCmd)
-	idUseCmd.Flags().BoolVarP(&idAddAddSSH, "ssh", "", true, "add ssh key to account")
-	idUseCmd.Flags().BoolVarP(&idAddOverwrite, "overwrite", "", false, "overwrite existing accounts with the same username")
-	idUseCmd.Flags().BoolVarP(&idAddGHToken, "gh-token", "", true, "create token for github instead of using plain text password")
-}
-
 type tIDLists struct {
 	List map[string][]tIDInfo
 }
@@ -318,6 +318,9 @@ type githubFailureData struct {
 var overrideIDEnsureSSHNumber = 0
 
 func ensurePublicKeyGithub(idInfo tIDInfo) {
+	if verbose {
+		log.Println("ensuring public key added to github")
+	}
 	installID := mainViper.GetString("installation-id")
 	if overrideIDEnsureSSHNumber != 0 {
 		installID += "-" + strconv.Itoa(overrideIDGHTokenNumber)
@@ -347,13 +350,18 @@ func ensurePublicKeyGithub(idInfo tIDInfo) {
 		if len(errorsObj.Errors) > 0 {
 			errorMessage := errorsObj.Errors[0]["message"]
 			if errorMessage == "key is already in use" {
-				// already have that key, that's success
+				if verbose {
+					log.Println("already have that key")
+				}
 				return
 			}
 		} else {
 			log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)
 			log.Fatal(string(b))
 		}
+	}
+	if verbose {
+		log.Println("Sucessfully added key to github")
 	}
 
 	defer resp.Body.Close()
