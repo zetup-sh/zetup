@@ -26,7 +26,7 @@ func init() {
 
 func unuse() {
 	restoreLinkFiles()
-	unuseFile, err := FindFile(usePkgDir, "unuse", runtime.GOOS, unixExtensions, mainViper)
+	unuseFile, err := findFile(usePkgDir, "unuse", runtime.GOOS, unixExtensions, mainViper)
 	if err == nil {
 		err = runFile(unuseFile)
 	}
@@ -44,7 +44,7 @@ func restoreLinkFiles() {
 		dat, err := ioutil.ReadFile(linkBackupFile)
 		check(err)
 
-		var backedupFiles []BackupFileInfo
+		var backedupFiles []tBackupFileInfo
 		yaml.Unmarshal(dat, &backedupFiles)
 		for _, backedupFile := range backedupFiles {
 			restoreLinkFile(backedupFile)
@@ -53,7 +53,7 @@ func restoreLinkFiles() {
 	ioutil.WriteFile(linkBackupFile, []byte(""), 0644)
 }
 
-func restoreLinkFile(fi BackupFileInfo) {
+func restoreLinkFile(fi tBackupFileInfo) {
 	if fi.SymSource == "" {
 		err = os.Remove(fi.Location)
 		check(err)

@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/manifoldco/promptui"
-	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 )
@@ -589,7 +588,7 @@ func writeGitConfig() {
 	name = %v
 	email = %v
 `, mainViper.Get("user.name"), mainViper.Get("user.email"))
-	home, _ := homedir.Dir()
+	home, _ := os.UserHomeDir()
 	gitconfigFile := path.Join(home, ".gitconfig")
 	if !exists(gitconfigFile) {
 		_ = ioutil.WriteFile(gitconfigFile, []byte(gitConfigFile), 0644)

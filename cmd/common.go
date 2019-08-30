@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -16,15 +17,15 @@ import (
 )
 
 // used by use and unuse
-type BackupFileInfo struct {
+type tBackupFileInfo struct {
 	Location  string `yaml:"location"`
 	Contents  string `yaml:"contents"`
-	SymSource string `yaml"symsource"`
+	SymSource string `yaml:"symsource"`
 }
 
 var err error
 
-func FindFile(
+func findFile(
 	dir string,
 	prefix string,
 	suffix string,
@@ -67,9 +68,9 @@ func FindFile(
 
 	if !foundCmdFilePath {
 		return "", errors.New("no " + prefix + " file found")
-	} else {
-		return cmdFilePath, nil
 	}
+
+	return cmdFilePath, nil
 }
 
 func runFile(cmdFilePath string) error {
@@ -148,4 +149,11 @@ func isSymLink(path string) bool {
 	}
 	// not exist
 	return false
+}
+
+func ensureParentDir(file string) {
+	dir := filepath.Dir(file)
+	if !exists(dir) {
+		os.MkdirAll(dir, 0755)
+	}
 }

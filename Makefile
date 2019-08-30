@@ -29,4 +29,8 @@ publish-test-linux-vm: build-linux
 
 .PHONY: copy-public-key-vm
 copy-public-key-vm:
-	cat "${HOME}\.ssh\id_rsa.pub" | ssh zwhitchcox@localhost -p 1111 "cat >> /home/zwhitchcox/.ssh/authorized_keys"
+	cat "${HOME}\.ssh\id_rsa.pub" | ssh zwhitchcox@localhost -p 1111 "mkdir -p ~/.ssh && cat >> /home/zwhitchcox/.ssh/authorized_keys"
+
+.PHONY: restore-snapshot
+restore-snapshot:
+	VBoxManage snapshot "Manjaro Gnome Master" restore "SSH and Port Forwarding"

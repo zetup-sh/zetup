@@ -48,7 +48,7 @@ func linkFile(source string, target string) {
 
 	// back up file if it exists
 	if exists(target) {
-		var backedupFiles []BackupFileInfo
+		var backedupFiles []tBackupFileInfo
 		// get current backups
 		if exists(linkBackupFile) {
 			dat, err := ioutil.ReadFile(linkBackupFile)
@@ -63,7 +63,7 @@ func linkFile(source string, target string) {
 				return
 			}
 		}
-		var backupFileInfo BackupFileInfo
+		var backupFileInfo tBackupFileInfo
 		backupFileInfo.Location = target
 		if isSymLink(target) {
 			symsource, err := os.Readlink(target)

@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	git "gopkg.in/src-d/go-git.v4"
+	"gopkg.in/src-d/go-git.v4/plumbing"
 	ssh2 "gopkg.in/src-d/go-git.v4/plumbing/transport/ssh"
 )
 
@@ -31,8 +32,7 @@ var useCmd = &cobra.Command{
 func usePkg(pkgToInstall string) {
 	repo := parseRepoName(pkgToInstall)
 	usePkgDir = filepath.Join(pkgDir, repo.Joined)
-
-	ensureRepo(repo, usePkgDir)
+	ensureRepo(repo, usePkgDir, useBranch, useProtocol)
 
 	pkgViper = viper.New()
 	pkgViper.AddConfigPath(usePkgDir)
@@ -51,7 +51,7 @@ func usePkg(pkgToInstall string) {
 	mainViper.Set("cur-pkg", usePkgDir)
 	mainViper.WriteConfig()
 
-	useFile, err := FindFile(usePkgDir, "use", runtime.GOOS, unixExtensions, mainViper)
+	useFile, err := findFile(usePkgDir, "use", runtime.GOOS, unixExtensions, mainViper)
 	if err == nil {
 		if verbose {
 			vLog.Printf("running use file %s\n", useFile)
@@ -66,8 +66,13 @@ func usePkg(pkgToInstall string) {
 
 }
 
+var useBranch string
+var useProtocol string
+
 func init() {
 	rootCmd.AddCommand(useCmd)
+	useCmd.Flags().StringVarP(&useBranch, "branch", "b", "", "specify a branch to use, otherwise it will use default")
+	useCmd.Flags().StringVarP(&useProtocol, "protocol", "p", "try-both", "protocol to use (ssh, https or try-both which tries ssh then https)")
 }
 
 var usePkgDir string
@@ -108,7 +113,7 @@ func parseRepoName(repo string) repoInfo {
 	}
 }
 
-func ensureRepo(repo repoInfo, localPath string) {
+func ensureRepo(repo repoInfo, localPath string, branch string, protocol string) {
 	if _, err := os.Stat(usePkgDir); os.IsNotExist(err) {
 		err := os.MkdirAll(filepath.Dir(localPath), 0755)
 		if err != nil {
@@ -119,30 +124,56 @@ func ensureRepo(repo repoInfo, localPath string) {
 		}
 
 		var url string
-		hosttype := getValidIDLngName(repo.Hostname)
-		username := mainViper.GetString(hosttype + ".username")
+		// hosttype := getValidIDLngName(repo.Hostname)
+		// username := mainViper.GetString(hosttype + ".username")
+
 		var r *git.Repository
-		if repo.Username != username {
-			url = fmt.Sprintf("https://%s/%s/%s.git", repo.Hostname, repo.Username, repo.Reponame)
-			r, err = git.PlainClone(localPath, false, &git.CloneOptions{
-				URL:               url,
-				RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
-			})
-		} else {
+		var cloneOptions git.CloneOptions
+
+		if protocol == "ssh" || protocol == "try-both" {
 			privateKeyFile := mainViper.GetString("private-key-file")
 			pem, _ := ioutil.ReadFile(privateKeyFile)
 			signer, _ := ssh.ParsePrivateKey(pem)
-			auth := &ssh2.PublicKeys{User: "git", Signer: signer}
+			auth := &ssh2.PublicKeys{
+				User:   "git",
+				Signer: signer,
+			}
+			// user should add host with ssh-keyscan
+			// we do not handle that though. maybe we should?
+			auth.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+
 			url = fmt.Sprintf("git@github.com:%s/%s.git", repo.Username, repo.Reponame)
-			r, err = git.PlainClone(localPath, false, &git.CloneOptions{
+			cloneOptions = git.CloneOptions{
 				URL:               url,
 				RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
 				Auth:              auth,
-			})
+			}
+		} else if protocol == "https" {
+			url = fmt.Sprintf("https://%s/%s/%s.git", repo.Hostname, repo.Username, repo.Reponame)
+			cloneOptions = git.CloneOptions{
+				URL:               url,
+				RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
+			}
 		}
 
+		if useBranch != "" {
+			rname := fmt.Sprintf("refs/heads/%s", branch)
+			cloneOptions.ReferenceName = plumbing.ReferenceName(rname)
+		}
+		r, err = git.PlainClone(localPath, false, &cloneOptions)
+		if err != nil && protocol == "try-both" {
+			ensureRepo(repo, localPath, branch, "https")
+			return
+		}
 		check(err)
-		_, err = r.Head()
+
+		ref, err := r.Head()
 		check(err)
+
+		commit, err := r.CommitObject(ref.Hash())
+		check(err)
+
+		fmt.Println(commit)
+
 	}
 }

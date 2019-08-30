@@ -17,7 +17,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
-	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )
 
@@ -28,13 +27,6 @@ var rootCmd = &cobra.Command{
 	//Run: func(cmd *cobra.Command, args []string) {
 	//log.Println("print this")
 	//},
-}
-
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
 }
 
 var vLog = color.New(color.FgCyan)
@@ -110,7 +102,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 	rootCmd.PersistentFlags().StringVarP(&idFile, "id-file", "", "", "file to store identities")
 
-	home, err := homedir.Dir()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -145,7 +137,7 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	home, err := homedir.Dir()
+	home, err := os.UserHomeDir()
 
 	pkgDir = mainViper.GetString("pkg-dir")
 	if pkgDir == "" {
