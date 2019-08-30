@@ -97,6 +97,16 @@ func ensureSSHKey() {
 
 	privateKeyBytes := util.EncodePrivateKeyToPEM(privateKey)
 
+	privateSSHDir := privateKeyFile
+	if !exists(privateSSHDir) {
+		os.MkdirAll(privateSSHDir, 0755)
+	}
+
+	publicSSHDir := publicKeyFile
+	if !exists(publicSSHDir) {
+		os.MkdirAll(publicSSHDir, 0755)
+	}
+
 	err = util.WriteKeyToFile(privateKeyBytes, privateKeyFile)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -110,7 +120,7 @@ func ensureSSHKey() {
 
 func getSSHPubKey() string {
 	publicKeyFile := mainViper.GetString("public-key-file")
-	if util.Exists(publicKeyFile) {
+	if exists(publicKeyFile) {
 		dat, err := ioutil.ReadFile(publicKeyFile)
 		check(err)
 		return string(dat)

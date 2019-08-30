@@ -47,6 +47,10 @@ func usePkg(pkgToInstall string) {
 	}
 
 	unuse()
+
+	mainViper.Set("cur-pkg", usePkgDir)
+	mainViper.WriteConfig()
+
 	useFile, err := FindFile(usePkgDir, "use", runtime.GOOS, unixExtensions, mainViper)
 	if err == nil {
 		if verbose {
@@ -60,8 +64,6 @@ func usePkg(pkgToInstall string) {
 		log.Fatalln(useFile, err)
 	}
 
-	mainViper.Set("cur-pkg", usePkgDir)
-	mainViper.WriteConfig()
 }
 
 func init() {

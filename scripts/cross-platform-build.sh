@@ -25,11 +25,17 @@ do
     output_name+='.exe'
   fi
 
-  echo "Running env GOOS=$GOOS GOARCH=$GOARCH go build -o build/$output_name $package"
   env GOOS=$GOOS GOARCH=$GOARCH go build -o $output_name $package
   if [ $? -ne 0 ]; then
     echo 'An error has occurred! Aborting the script execution...'
     exit 1
   fi
-  zip  "$output_name.zip" "$output_name"
+
+  if [ "${ZETUP_NO_ZIP}" != "true" ] ; then
+    if [ -x "$(command -v zip)" ] ; then
+      zip  "$output_name.zip" "$output_name"
+    elif [ -x "$(command -v 7z)" ] ; then
+      7z a "$output_name.zip" "$output_name"
+    fi
+  fi
 done

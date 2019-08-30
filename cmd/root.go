@@ -137,7 +137,7 @@ func init() {
 		}
 
 		idFile = filepath.Join(zetupDir, "identities.yml")
-		// if !util.Exists("identities.yml") {
+		// if !exists("identities.yml") {
 
 		// }
 	}

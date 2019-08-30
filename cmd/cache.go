@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/zetup-sh/zetup/cmd/util"
 	"gopkg.in/yaml.v2"
 )
 
@@ -124,7 +123,7 @@ func cacheOutputAll() {
 
 func readCacheFile() tCacheItems {
 	var cacheItems tCacheItems
-	if util.Exists(cacheFile) {
+	if exists(cacheFile) {
 		dat, err := ioutil.ReadFile(cacheFile)
 		check(err)
 		yaml.Unmarshal(dat, &cacheItems)

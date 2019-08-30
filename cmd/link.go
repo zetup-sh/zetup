@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/zetup-sh/zetup/cmd/util"
 	"gopkg.in/yaml.v2"
 )
 
@@ -25,9 +24,9 @@ var linkCmd = &cobra.Command{
 	Note: if you have already linked a file, the backup will not be overwritten. So, it is safe to call more than once.
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		target := args[0]
-		source := args[1]
-		linkFile(target, source)
+		source := args[0]
+		target := args[1]
+		linkFile(source, target)
 	},
 }
 
@@ -48,11 +47,10 @@ func linkFile(source string, target string) {
 	}
 
 	// back up file if it exists
-	if util.Exists(target) {
+	if exists(target) {
 		var backedupFiles []BackupFileInfo
-
 		// get current backups
-		if util.Exists(linkBackupFile) {
+		if exists(linkBackupFile) {
 			dat, err := ioutil.ReadFile(linkBackupFile)
 			check(err)
 			yaml.Unmarshal(dat, &backedupFiles)
@@ -65,14 +63,18 @@ func linkFile(source string, target string) {
 				return
 			}
 		}
-
-		// back up target
-		dat, err := ioutil.ReadFile(target)
-		check(err)
-		backupFileInfo := BackupFileInfo{
-			target,
-			string(dat),
+		var backupFileInfo BackupFileInfo
+		backupFileInfo.Location = target
+		if isSymLink(target) {
+			symsource, err := os.Readlink(target)
+			check(err)
+			backupFileInfo.SymSource = symsource
+		} else {
+			dat, err := ioutil.ReadFile(target)
+			check(err)
+			backupFileInfo.Contents = string(dat)
 		}
+
 		filesToBackup := append(backedupFiles, backupFileInfo)
 		marshaled, err := yaml.Marshal(filesToBackup)
 		check(err)

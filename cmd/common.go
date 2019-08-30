@@ -17,8 +17,9 @@ import (
 
 // used by use and unuse
 type BackupFileInfo struct {
-	Location string `yaml:"location"`
-	Contents string `yaml:"contents"`
+	Location  string `yaml:"location"`
+	Contents  string `yaml:"contents"`
+	SymSource string `yaml"symsource"`
 }
 
 var err error
@@ -130,4 +131,21 @@ func check(err error) {
 		debug.PrintStack()
 		log.Fatal(err)
 	}
+}
+
+func exists(path string) bool {
+	if _, err := os.Lstat(path); err == nil {
+		// exist
+		return true
+	}
+	// not exist
+	return false
+}
+
+func isSymLink(path string) bool {
+	if fi, err := os.Lstat(path); err == nil {
+		return (fi.Mode() & os.ModeSymlink) != 0
+	}
+	// not exist
+	return false
 }

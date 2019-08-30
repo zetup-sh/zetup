@@ -17,7 +17,6 @@ import (
 	"github.com/manifoldco/promptui"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
-	"github.com/zetup-sh/zetup/cmd/util"
 	"gopkg.in/yaml.v2"
 )
 
@@ -75,6 +74,7 @@ func idsInitialize(idsInfo []tIDInfo) {
 		// this will skip if it's already been set
 		getUserInfoFromGitlab(idInfo)
 		getUserInfoFromGithub()
+		writeGitConfig()
 
 		mainViper.WriteConfig()
 	}
@@ -302,7 +302,7 @@ type tIDLists struct {
 
 func getCurrentIdentityLists() tIDLists {
 	var IDLists tIDLists
-	if util.Exists(idFile) {
+	if exists(idFile) {
 		dat, err := ioutil.ReadFile(idFile)
 		check(err)
 		yaml.Unmarshal(dat, &IDLists)
@@ -505,9 +505,9 @@ func getUserInfoFromGitlab(idInfo tIDInfo) {
 	viperUserInfo := mainViper.GetStringMapString("user")
 	userInfo.Email = viperUserInfo["email"]
 	userInfo.Name = viperUserInfo["name"]
-	userInfo.GithubUsername = mainViper.GetString("gitlab.username")
+	gitlabUsername := mainViper.GetString("gitlab.username")
 
-	if userInfo.GithubUsername == "" || userInfo.Name != "" || userInfo.Email != "" {
+	if gitlabUsername == "" || userInfo.Name != "" || userInfo.Email != "" {
 		return
 	}
 
@@ -540,7 +540,6 @@ func getUserInfoFromGitlab(idInfo tIDInfo) {
 	// write token to file
 	mainViper.Set("user.name", userInfo.Name)
 	mainViper.Set("user.email", userInfo.Email)
-
 }
 
 func getUserInfoFromGithub() {
@@ -551,7 +550,7 @@ func getUserInfoFromGithub() {
 	username := mainViper.GetString("github.username")
 	password := mainViper.GetString("github.password")
 
-	if userInfo.GithubUsername == "" || userInfo.Name != "" || userInfo.Email != "" {
+	if username == "" || userInfo.Name != "" || userInfo.Email != "" {
 		return
 	}
 
@@ -592,7 +591,7 @@ func writeGitConfig() {
 `, mainViper.Get("user.name"), mainViper.Get("user.email"))
 	home, _ := homedir.Dir()
 	gitconfigFile := path.Join(home, ".gitconfig")
-	if !util.Exists(gitconfigFile) {
+	if !exists(gitconfigFile) {
 		_ = ioutil.WriteFile(gitconfigFile, []byte(gitConfigFile), 0644)
 	}
 }

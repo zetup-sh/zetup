@@ -8,3 +8,4 @@ vendor
 /yarn.lock
 /package-lock.json
 /zetup*
+env.sh
