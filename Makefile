@@ -17,7 +17,6 @@ release:
 publish-test: build
 	scp -r ./build/* 192.168.1.68:/home/zane/dev/test-files
 
-# curl -L -O 192.168.1.68:6969/zetup-linux-amd64 && chmod +x ./zetup-linux-amd64 && sudo mv -f ./zetup-linux-amd64 /bin/zetup
 .PHONY: push-test-linux
 publish-test-linux: build-linux
 	scp -r ./build/*linux* 192.168.1.68:/home/zane/dev/test-files
@@ -33,4 +32,10 @@ copy-public-key-vm:
 
 .PHONY: restore-snapshot
 restore-snapshot:
+	VBoxManage controlvm "Manjaro Gnome Master" poweroff
 	VBoxManage snapshot "Manjaro Gnome Master" restore "SSH and Port Forwarding"
+	VBoxManage startvm "Manjaro Gnome Master" --type headless
+
+.PHONY: run-zetup-init-vm
+run-zetup-init-vm:
+	ssh -t -p 1111 zwhitchcox@localhost "zetup id use gh/zwhitchcox:${GITHUB_PASS} && zetup use -b add-arch -p ssh github.com/zetup-sh/zetup-pkg"

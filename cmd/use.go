@@ -170,10 +170,8 @@ func ensureRepo(repo repoInfo, localPath string, branch string, protocol string)
 		ref, err := r.Head()
 		check(err)
 
-		commit, err := r.CommitObject(ref.Hash())
+		_, err = r.CommitObject(ref.Hash())
 		check(err)
-
-		fmt.Println(commit)
 
 	}
 }

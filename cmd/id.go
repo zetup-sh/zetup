@@ -28,6 +28,7 @@ var idCmd = &cobra.Command{
 
 	// },
 }
+
 var idUseCmd = &cobra.Command{
 	Use:   "use",
 	Short: "use identities",
@@ -509,30 +510,34 @@ func getUserInfoFromGitlab(idInfo tIDInfo) {
 	if gitlabUsername == "" || userInfo.Name != "" || userInfo.Email != "" {
 		return
 	}
-
-	// get info with personal access token
-	req, err := http.NewRequest("GET", "https://gitlab.com/v4/api/user", nil)
+	glTemporaryToken := getTemporaryGitlabToken(idInfo)
+	endPoint := "https://gitlab.com/api/v4/user"
+	req, err := http.NewRequest("GET", endPoint, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	req.Header.Set("Authorization", "Bearer "+getTemporaryGitlabToken(idInfo))
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+glTemporaryToken)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer resp.Body.Close()
 	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
 		b, _ := ioutil.ReadAll(resp.Body)
 		log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)
 		log.Println(string(b))
-		log.Println("We could not retrieve your user information. This is a non fatal error")
+		log.Println("We could not retrieve your user information from gitlab. This is a non fatal error")
 	}
-
-	defer resp.Body.Close()
 
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(&userInfo)
 	if err != nil {
+		b, _ := ioutil.ReadAll(resp.Body)
+		log.Printf("resp.StatusCode = %+v\n", resp.StatusCode)
+		log.Println(string(b))
 		log.Fatal(err)
 	}
 
