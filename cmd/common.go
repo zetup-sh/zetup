@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -156,4 +158,12 @@ func ensureParentDir(file string) {
 	if !exists(dir) {
 		os.MkdirAll(dir, 0755)
 	}
+}
+
+func removeLineFromConfig(line string) {
+	dat, err := ioutil.ReadFile(cfgFile)
+	check(err)
+	removed := bytes.Replace(dat, []byte(line+"\n"), []byte(""), 1)
+	err = ioutil.WriteFile(cfgFile, removed, 0644)
+	check(err)
 }

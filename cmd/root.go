@@ -29,6 +29,7 @@ var rootCmd = &cobra.Command{
 	//},
 }
 
+// Execute avoids linting error
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -129,6 +130,7 @@ func init() {
 		}
 		mainViper.AddConfigPath(zetupDir)
 		mainViper.SetConfigName("config")
+		cfgFile = zetupDir + "/config.yml"
 
 		err = os.MkdirAll(zetupDir, 0755)
 		if err != nil {
@@ -179,8 +181,9 @@ func initConfig() {
 		if err != nil {
 			panic(err)
 		}
-		installationID = fmt.Sprintf("zetup-%v-%v-%v", hostname, username, randWords)
+		installationID = fmt.Sprintf("zetup-%v-%v%v", hostname, username, randWords)
 		mainViper.Set("installation-id", installationID)
+		mainViper.WriteConfig()
 	}
 
 	publicKeyFile := mainViper.GetString("public-key-file")
@@ -199,4 +202,5 @@ func initConfig() {
 	_ = os.Mkdir(bakDir, 0755)
 
 	linkBackupFile = path.Join(zetupDir, ".link-backup")
+
 }
