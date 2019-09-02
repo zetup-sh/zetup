@@ -21,6 +21,10 @@ var idDeleteCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		gitlabInfo := getGitlabInfo()
 		githubInfo := getGithubInfo()
+		toDelete := args
+		if idDeleteAll {
+			toDelete = append(toDelete, "github", "gitlab")
+		}
 		for _, arg := range args {
 			normalized := getValidIDLngName(arg)
 			if normalized == "gitlab" {

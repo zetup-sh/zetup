@@ -181,7 +181,7 @@ func initConfig() {
 		if err != nil {
 			panic(err)
 		}
-		installationID = fmt.Sprintf("zetup-%v-%v%v", hostname, username, randWords)
+		installationID = fmt.Sprintf("zetup-%v-%v-%v", hostname, username, randWords)
 		mainViper.Set("installation-id", installationID)
 		mainViper.WriteConfig()
 	}

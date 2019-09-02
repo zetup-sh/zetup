@@ -34,7 +34,8 @@ var envCmd = &cobra.Command{
 				if !strings.HasPrefix(key, "zetup-") {
 					envStr += "ZETUP_"
 				}
-				envStr += strings.ToUpper(strings.ReplaceAll(key, "-", "_")) + "=" + v + "\n"
+				envName := strings.ToUpper(strings.ReplaceAll(key, "-", "_"))
+				envStr += fmt.Sprintf("%s=\"%s\"\n", envName, v)
 			}
 		}
 		envStr += "# add eval `zetup env` to your .bashrc\n"

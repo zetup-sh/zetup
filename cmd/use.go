@@ -165,6 +165,9 @@ func ensureRepo(repo repoInfo, localPath string, branch string, protocol string)
 			ensureRepo(repo, localPath, branch, "https")
 			return
 		}
+		if err != nil {
+			log.Println("There was a problem cloning " + repo.Reponame)
+		}
 		check(err)
 
 		ref, err := r.Head()

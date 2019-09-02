@@ -16,6 +16,8 @@ var idCmd = &cobra.Command{
 	// },
 }
 
+var idDeleteAll bool
+
 func init() {
 	idFile = filepath.Join(zetupDir, "identities.yml")
 	rootCmd.AddCommand(idCmd)
@@ -26,6 +28,7 @@ func init() {
 	idUseCmd.Flags().BoolVarP(&idAddGHToken, "gh-token", "", true, "create token for github instead of using plain text password")
 
 	idCmd.AddCommand(idDeleteCmd)
+	idDeleteCmd.Flags().BoolVarP(&idDeleteAll, "all", "a", false, "delete all foreign keys/ids")
 }
 
 // creates tokens, adds public keys, etc.

@@ -12,8 +12,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var idUseCmd = &cobra.Command{
@@ -92,18 +92,11 @@ func getIDParts(idInfo tIDInfo) tIDInfo {
 		} else if idInfo.Type == "gitlab" {
 			fmt.Println("Note: gitlab passwords will be stored as plain text.\nYou can generate a token here: https://gitlab.com/profile/personal_access_tokens")
 		}
-		prompt := promptui.Prompt{
-			Label: titleType + " " + idInfo.Username + " password or token: ",
-			Mask:  '*',
-		}
-
-		userInput, err := prompt.Run()
-		if err != nil {
-			fmt.Println("signal interrupt detected")
-			os.Exit(1)
-		}
-		idInfo.Password = userInput
+		fmt.Println(titleType + " " + idInfo.Username + " password or token: ")
+		userInput, _ := terminal.ReadPassword(int(os.Stdin.Fd()))
+		idInfo.Password = string(userInput)
 	}
+
 	return idInfo
 }
 
