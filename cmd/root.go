@@ -130,7 +130,7 @@ func init() {
 		}
 		mainViper.AddConfigPath(zetupDir)
 		mainViper.SetConfigName("config")
-		cfgFile = zetupDir + "/config.yml"
+		cfgFile = path.Join(zetupDir, "config.yml")
 
 		err = os.MkdirAll(zetupDir, 0755)
 		if err != nil {
