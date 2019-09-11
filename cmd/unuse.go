@@ -7,7 +7,6 @@ import (
 	"runtime"
 
 	"github.com/spf13/cobra"
-	"github.com/zetup-sh/zetup/cmd/util"
 	"gopkg.in/yaml.v2"
 )
 
@@ -27,7 +26,7 @@ func init() {
 
 func unuse() {
 	restoreLinkFiles()
-	unuseFile, err := FindFile(usePkgDir, "unuse", runtime.GOOS, unixExtensions, mainViper)
+	unuseFile, err := findFile(usePkgDir, "unuse", runtime.GOOS, unixExtensions, mainViper)
 	if err == nil {
 		err = runFile(unuseFile)
 	}
@@ -41,17 +40,25 @@ func unuse() {
 }
 
 func restoreLinkFiles() {
-	if util.Exists(linkBackupFile) {
+	if exists(linkBackupFile) {
 		dat, err := ioutil.ReadFile(linkBackupFile)
 		check(err)
 
-		var backedupFiles []BackupFileInfo
+		var backedupFiles []tBackupFileInfo
 		yaml.Unmarshal(dat, &backedupFiles)
 		for _, backedupFile := range backedupFiles {
-			err = os.Remove(backedupFile.Location)
-			check(err)
-			ioutil.WriteFile(backedupFile.Location, []byte(backedupFile.Contents), 0644)
+			restoreLinkFile(backedupFile)
 		}
 	}
 	ioutil.WriteFile(linkBackupFile, []byte(""), 0644)
+}
+
+func restoreLinkFile(fi tBackupFileInfo) {
+	if fi.SymSource == "" {
+		err = os.Remove(fi.Location)
+		check(err)
+		ioutil.WriteFile(fi.Location, []byte(fi.Contents), 0644)
+	} else {
+		os.Symlink(fi.SymSource, fi.Location)
+	}
 }

@@ -2,12 +2,15 @@ package cmd
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -16,14 +19,15 @@ import (
 )
 
 // used by use and unuse
-type BackupFileInfo struct {
-	Location string `yaml:"location"`
-	Contents string `yaml:"contents"`
+type tBackupFileInfo struct {
+	Location  string `yaml:"location"`
+	Contents  string `yaml:"contents"`
+	SymSource string `yaml:"symsource"`
 }
 
 var err error
 
-func FindFile(
+func findFile(
 	dir string,
 	prefix string,
 	suffix string,
@@ -66,9 +70,9 @@ func FindFile(
 
 	if !foundCmdFilePath {
 		return "", errors.New("no " + prefix + " file found")
-	} else {
-		return cmdFilePath, nil
 	}
+
+	return cmdFilePath, nil
 }
 
 func runFile(cmdFilePath string) error {
@@ -130,4 +134,36 @@ func check(err error) {
 		debug.PrintStack()
 		log.Fatal(err)
 	}
+}
+
+func exists(path string) bool {
+	if _, err := os.Lstat(path); err == nil {
+		// exist
+		return true
+	}
+	// not exist
+	return false
+}
+
+func isSymLink(path string) bool {
+	if fi, err := os.Lstat(path); err == nil {
+		return (fi.Mode() & os.ModeSymlink) != 0
+	}
+	// not exist
+	return false
+}
+
+func ensureParentDir(file string) {
+	dir := filepath.Dir(file)
+	if !exists(dir) {
+		os.MkdirAll(dir, 0755)
+	}
+}
+
+func removeLineFromConfig(line string) {
+	dat, err := ioutil.ReadFile(cfgFile)
+	check(err)
+	removed := bytes.Replace(dat, []byte(line+"\n"), []byte(""), 1)
+	err = ioutil.WriteFile(cfgFile, removed, 0644)
+	check(err)
 }

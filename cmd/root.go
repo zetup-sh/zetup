@@ -17,7 +17,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
-	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )
 
@@ -30,6 +29,7 @@ var rootCmd = &cobra.Command{
 	//},
 }
 
+// Execute avoids linting error
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -111,7 +111,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 	rootCmd.PersistentFlags().StringVarP(&idFile, "id-file", "", "", "file to store identities")
 
-	home, err := homedir.Dir()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -131,6 +131,7 @@ func init() {
 		}
 		mainViper.AddConfigPath(zetupDir)
 		mainViper.SetConfigName("config")
+		cfgFile = zetupDir + "/config.yml"
 
 		err = os.MkdirAll(zetupDir, 0755)
 		if err != nil {
@@ -138,7 +139,7 @@ func init() {
 		}
 
 		idFile = filepath.Join(zetupDir, "identities.yml")
-		// if !util.Exists("identities.yml") {
+		// if !exists("identities.yml") {
 
 		// }
 	}
@@ -146,7 +147,7 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	home, err := homedir.Dir()
+	home, err := os.UserHomeDir()
 
 	pkgDir = mainViper.GetString("pkg-dir")
 	if pkgDir == "" {
@@ -181,8 +182,9 @@ func initConfig() {
 		if err != nil {
 			panic(err)
 		}
-		installationID = fmt.Sprintf("zetup-%v-%v-%v", hostname, username, randWords)
+		installationID = fmt.Sprintf("zetup-%v-%v%v", hostname, username, randWords)
 		mainViper.Set("installation-id", installationID)
+		mainViper.WriteConfig()
 	}
 
 	publicKeyFile := mainViper.GetString("public-key-file")
@@ -201,4 +203,5 @@ func initConfig() {
 	_ = os.Mkdir(bakDir, 0755)
 
 	linkBackupFile = path.Join(zetupDir, ".link-backup")
+
 }
