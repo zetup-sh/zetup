@@ -40,6 +40,7 @@ func Execute() {
 var vLog = color.New(color.FgCyan)
 
 var unixExtensions = []string{"", ".sh", ".bash", ".zsh"}
+var windowsExtensions = []string{".ps1"}
 var mainViper *viper.Viper
 
 var cfgFile string

@@ -31,5 +31,12 @@ do
     echo 'An error has occurred! Aborting the script execution...'
     exit 1
   fi
-  zip  "$output_name.zip" "$output_name"
+  echo "looking for zip"
+  if [ -x "$(command -v zip)" ] ; then
+    echo "zip command found"
+    zip  "$output_name.zip" "$output_name"
+  elif [ -x "$(command -v 7z)" ] ; then
+    echo "7z command found"
+    7z "$output_name.zip" "$output_name"
+  fi
 done
